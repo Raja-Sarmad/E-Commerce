@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FiChevronRight, FiUser } from "react-icons/fi";
+import { FiBarChart2, FiChevronRight, FiUser } from "react-icons/fi";
 import { Drawer } from "@/components/ui/Drawer";
 import { Logo } from "./Logo";
 import { useAuth } from "@/context/AuthProvider";
@@ -17,7 +17,7 @@ type MobileNavProps = {
 
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   return (
     <Drawer
@@ -60,6 +60,17 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
               className="ml-auto h-4 w-4 text-muted-foreground"
               aria-hidden
             />
+          </Link>
+        )}
+
+        {isAdmin && (
+          <Link
+            href="/admin"
+            onClick={onClose}
+            className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-strong"
+          >
+            <FiBarChart2 className="h-4 w-4" aria-hidden />
+            Admin dashboard
           </Link>
         )}
 

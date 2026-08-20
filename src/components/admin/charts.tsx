@@ -164,6 +164,13 @@ export function LineChart({
         ))}
         {series.map((s, si) => {
           const pts = s.points.map((p, i) => ({ x: toX(i), y: toY(p.value) }));
+          if (pts.length < 2) {
+            return (
+              <text key={s.name} x={width / 2} y={plotHeight / 2} textAnchor="middle" fill="var(--color-muted-foreground)" fontSize="12">
+                No data
+              </text>
+            );
+          }
           const path = smoothPath(pts);
           const areaBottom = toY(0);
           const area = `${path} L ${pts[pts.length - 1].x} ${areaBottom} L ${pts[0].x} ${areaBottom} Z`;

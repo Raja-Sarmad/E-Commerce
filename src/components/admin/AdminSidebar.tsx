@@ -32,7 +32,7 @@ import {
   FiX,
 } from "react-icons/fi";
 import { Badge } from "@/components/ui/Badge";
-import { useAuth } from "@/context/AuthProvider";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { cn } from "@/lib/utils";
 import { notifications } from "@/lib/data/admin";
 import { contactMessages } from "@/lib/data/admin";
@@ -162,7 +162,7 @@ function SidebarContent({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { data: user } = useGetMeQuery();
 
   return (
     <div className="flex h-full flex-col">

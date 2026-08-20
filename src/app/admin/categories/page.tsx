@@ -14,10 +14,15 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
-import { useToast } from "@/context/ToastProvider";
-import { categories as seedCategories } from "@/lib/data/categories";
-import { products } from "@/lib/data/products";
-import { generateId, slugify } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminCategoriesQuery,
+  useCreateCategoryMutation,
+  useUpdateCategoryMutation,
+  useDeleteCategoryMutation,
+} from "@/lib/rtk/adminApi";
+import type { AdminCategory } from "@/lib/rtk/adminApi";
+import { slugify } from "@/lib/utils";
 import type { Category } from "@/lib/types";
 
 const PER_PAGE = 8;
@@ -36,9 +41,20 @@ const emptyForm: CategoryForm = {
   featured: false,
 };
 
+function toCategory(c: AdminCategory): Category {
+  return {
+    id: c._id,
+    slug: c.slug,
+    name: c.name,
+    description: c.description,
+    image: c.image,
+    icon: c.icon,
+    count: c.count,
+    featured: c.featured,
+  };
+}
+
 export default function AdminCategoriesPage() {
-  const { success, info, warning } = useToast();
-  const [items, setItems] = useState<Category[]>(seedCategories);
   const [query, setQuery] = useState("");
   const [featured, setFeatured] = useState("all");
   const [page, setPage] = useState(1);
@@ -48,15 +64,14 @@ export default function AdminCategoriesPage() {
   const [form, setForm] = useState<CategoryForm>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
-  const productCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    products.forEach((p) => {
-      counts.set(p.categorySlug, (counts.get(p.categorySlug) ?? 0) + 1);
-    });
-    return counts;
-  }, []);
+  const { data, isLoading } = useGetAdminCategoriesQuery({});
+  const [createCategory] = useCreateCategoryMutation();
+  const [updateCategory] = useUpdateCategoryMutation();
+  const [deleteCategory] = useDeleteCategoryMutation();
 
-  const countFor = (cat: Category) => productCounts.get(cat.slug) ?? cat.count ?? 0;
+  const items = useMemo(() => {
+    return (data?.items ?? []).map(toCategory);
+  }, [data]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -94,55 +109,84 @@ export default function AdminCategoriesPage() {
   const save = () => {
     const name = form.name.trim();
     if (!name) {
-      warning("Name required", "Please enter a category name.");
+      toast.warning("Name required", "Please enter a category name.");
       return;
     }
     const slug = slugify(name);
     if (items.some((c) => c.slug === slug && c.id !== editing?.id)) {
-      warning("Duplicate category", "A category with this name already exists.");
+      toast.warning("Duplicate category", "A category with this name already exists.");
       return;
     }
+
     if (editing) {
-      const updated: Category = {
-        ...editing,
-        name,
-        slug,
-        description: form.description.trim(),
-        image: form.image.trim() || editing.image,
-        featured: form.featured,
-      };
-      setItems((prev) => prev.map((c) => (c.id === editing.id ? updated : c)));
-      success("Category updated", `“${updated.name}” was saved.`);
+      updateCategory({
+        id: editing.id,
+        body: {
+          name,
+          slug,
+          description: form.description.trim(),
+          image: form.image.trim() || editing.image,
+          featured: form.featured,
+        },
+      })
+        .unwrap()
+        .then(() => {
+          toast.success("Category updated", `"${name}" was saved.`);
+          setFormOpen(false);
+        })
+        .catch(() => {
+          toast.warning("Error", "Failed to update category.");
+        });
     } else {
-      const created: Category = {
-        id: generateId("cat"),
-        slug,
+      createCategory({
         name,
+        slug,
         description: form.description.trim(),
         image: form.image.trim() || `https://picsum.photos/seed/cat-${slug}/600/600`,
-        count: productCounts.get(slug) ?? 0,
+        count: 0,
         featured: form.featured,
-      };
-      setItems((prev) => [...prev, created]);
-      success("Category created", `“${created.name}” was added.`);
+        isActive: true,
+        order: items.length,
+      })
+        .unwrap()
+        .then(() => {
+          toast.success("Category created", `"${name}" was added.`);
+          setFormOpen(false);
+        })
+        .catch(() => {
+          toast.warning("Error", "Failed to create category.");
+        });
     }
-    setFormOpen(false);
   };
 
   const toggleFeatured = (cat: Category) => {
-    const updated = { ...cat, featured: !cat.featured };
-    setItems((prev) => prev.map((c) => (c.id === cat.id ? updated : c)));
-    info(
-      updated.featured ? "Featured" : "Unfeatured",
-      `“${cat.name}” ${updated.featured ? "marked as featured" : "removed from featured"}.`
-    );
+    updateCategory({
+      id: cat.id,
+      body: { featured: !cat.featured },
+    })
+      .unwrap()
+      .then(() => {
+        toast.info(
+          !cat.featured ? "Featured" : "Unfeatured",
+          `"${cat.name}" ${!cat.featured ? "marked as featured" : "removed from featured"}.`
+        );
+      })
+      .catch(() => {
+        toast.warning("Error", "Failed to update category.");
+      });
   };
 
   const remove = () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((c) => c.id !== deleteTarget.id));
-    success("Category removed", `“${deleteTarget.name}” was deleted.`);
-    setDeleteTarget(null);
+    deleteCategory(deleteTarget.id)
+      .unwrap()
+      .then(() => {
+        toast.success("Category removed", `"${deleteTarget.name}" was deleted.`);
+        setDeleteTarget(null);
+      })
+      .catch(() => {
+        toast.warning("Error", "Failed to delete category.");
+      });
   };
 
   const handlePageSize = (size: number) => {
@@ -184,10 +228,10 @@ export default function AdminCategoriesPage() {
       header: "Products",
       align: "center",
       sortable: true,
-      sortValue: (c) => countFor(c),
+      sortValue: (c) => c.count ?? 0,
       render: (c) => (
         <Badge variant="secondary" className="whitespace-nowrap">
-          {countFor(c)}
+          {c.count ?? 0}
         </Badge>
       ),
     },
@@ -255,7 +299,7 @@ export default function AdminCategoriesPage() {
                 Name: c.name,
                 Slug: c.slug,
                 Description: c.description,
-                Products: countFor(c),
+                Products: c.count ?? 0,
                 Featured: c.featured ? "Yes" : "No",
               }))}
               disabled={filtered.length === 0}
@@ -296,6 +340,7 @@ export default function AdminCategoriesPage() {
         columns={columns}
         rows={pageItems}
         rowKey={(c) => c.id}
+        loading={isLoading}
         pagination={{
           page,
           totalPages,
@@ -319,7 +364,7 @@ export default function AdminCategoriesPage() {
         onClose={() => setFormOpen(false)}
         title={editing ? "Edit category" : "Add category"}
         subtitle={
-          editing ? `Update “${editing.name}”.` : "Create a new product category."
+          editing ? `Update "${editing.name}".` : "Create a new product category."
         }
         size="lg"
       >
@@ -380,7 +425,7 @@ export default function AdminCategoriesPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={remove}
         title="Delete category?"
-        description={`This will permanently remove “${deleteTarget?.name}”. Products in this category will not be deleted.`}
+        description={`This will permanently remove "${deleteTarget?.name}". Products in this category will not be deleted.`}
         confirmLabel="Delete"
       />
     </div>

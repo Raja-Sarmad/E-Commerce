@@ -7,9 +7,8 @@ import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
-import { useAuth } from "@/context/AuthProvider";
-import { readOrders } from "@/lib/orders-store";
-import { sampleOrders } from "@/lib/data/content";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
+import { useGetMyOrdersQuery } from "@/lib/rtk/authApi";
 import type { Order, OrderStatus } from "@/lib/types";
 import { formatPrice, formatDate } from "@/lib/utils";
 
@@ -22,15 +21,11 @@ const statusVariant: Record<OrderStatus, "warning" | "info" | "success" | "destr
 };
 
 export default function OrdersPage() {
-  const { isAuthenticated, user } = useAuth();
-  const [placedOrders, setPlacedOrders] = useState<Order[]>([]);
-
-  useEffect(() => {
-    setPlacedOrders(readOrders());
-  }, []);
-
-  const orders = [...placedOrders, ...sampleOrders];
-  const filtered = user?.id === "us-admin-1" ? orders : orders;
+  const { data: user } = useGetMeQuery();
+  const isAuthenticated = Boolean(user);
+  const { data: orders = [], isLoading } = useGetMyOrdersQuery(undefined, {
+    skip: !isAuthenticated,
+  });
 
   return (
     <Container className="py-6">
@@ -52,7 +47,9 @@ export default function OrdersPage() {
           actionLabel="Sign in"
           actionHref="/login"
         />
-      ) : filtered.length === 0 ? (
+      ) : isLoading ? (
+        <p className="py-8 text-sm text-muted-foreground">Loading your orders...</p>
+      ) : orders.length === 0 ? (
         <EmptyState
           icon={<FiPackage className="h-7 w-7" aria-hidden />}
           title="No orders yet"
@@ -62,7 +59,7 @@ export default function OrdersPage() {
         />
       ) : (
         <div className="space-y-4">
-          {filtered.map((order) => (
+          {orders.map((order) => (
             <Link
               key={order.id}
               href={`/orders/${order.number}`}

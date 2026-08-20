@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { FiBox, FiEdit2, FiEye, FiPackage, FiPlus, FiStar, FiTrash2 } from "react-icons/fi";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
@@ -13,17 +12,19 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
-import { useToast } from "@/context/ToastProvider";
-import { readProducts, deleteProducts, deleteProduct, saveProduct } from "@/lib/products-store";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminProductsQuery,
+  useUpdateProductMutation,
+  useDeleteProductMutation,
+} from "@/lib/rtk/adminApi";
+import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
 const PER_PAGE = 8;
 
 export default function AdminProductsPage() {
-  const { info, success, warning } = useToast();
-  const [items, setItems] = useState<Product[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [stock, setStock] = useState("all");
@@ -34,10 +35,22 @@ export default function AdminProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  useEffect(() => {
-    setItems(readProducts());
-    setLoaded(true);
-  }, []);
+  const { data, isLoading } = useGetAdminProductsQuery({
+    search: query || undefined,
+    category: category === "all" ? undefined : category,
+    brand: brand === "all" ? undefined : brand,
+    stockStatus: stock === "all" ? undefined : stock,
+    sort: "position",
+    page,
+    limit: pageSize,
+  });
+
+  const [updateProduct, { isLoading: updating }] = useUpdateProductMutation();
+  const [deleteProduct, { isLoading: deleting }] = useDeleteProductMutation();
+
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, data?.totalPages ?? 1);
 
   const categories = useMemo(
     () => [...new Set(items.map((p) => p.category))].sort(),
@@ -48,54 +61,54 @@ export default function AdminProductsPage() {
     [items]
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((p) => {
-      const matchesQuery =
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q);
-      const matchesCategory = category === "all" || p.category === category;
-      const matchesBrand = brand === "all" || p.brand === brand;
-      const matchesStock =
-        stock === "all" ||
-        (stock === "low" && p.stock < 10) ||
-        (stock === "out" && p.stock === 0) ||
-        (stock === "in" && p.stock >= 10);
-      return matchesQuery && matchesCategory && matchesBrand && matchesStock;
-    });
-  }, [items, query, category, brand, stock]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  const toggleFeatured = (product: Product) => {
-    const updated = { ...product, isFeatured: !product.isFeatured };
-    saveProduct(updated);
-    setItems((prev) =>
-      prev.map((p) => (p.id === product.id ? updated : p))
-    );
-    info(
-      updated.isFeatured ? "Featured" : "Unfeatured",
-      `“${product.name}” ${updated.isFeatured ? "marked as featured" : "removed from featured"}.`
-    );
+  const toggleFeatured = async (product: Product) => {
+    const next = !product.isFeatured;
+    try {
+      await updateProduct({ id: product.id, body: { isFeatured: next } }).unwrap();
+      toast.info(
+        next ? "Featured" : "Unfeatured",
+        `“${product.name}” ${next ? "marked as featured" : "removed from featured"}.`
+      );
+    } catch (err) {
+      toast.warning("Could not update", getErrorMessage(err));
+    }
   };
 
-  const removeOne = (product: Product) => {
-    deleteProduct(product.id);
-    setItems((prev) => prev.filter((p) => p.id !== product.id));
-    setDeleteTarget(null);
-    success("Product removed", `“${product.name}” was deleted.`);
+  const removeOne = async (product: Product) => {
+    try {
+      await deleteProduct(product.id).unwrap();
+      setDeleteTarget(null);
+      toast.success("Product removed", `“${product.name}” was deleted.`);
+    } catch (err) {
+      toast.warning("Could not delete", getErrorMessage(err));
+    }
   };
 
-  const removeBulk = () => {
+  const removeBulk = async () => {
     const ids = [...selected];
-    deleteProducts(ids);
-    setItems((prev) => prev.filter((p) => !ids.includes(p.id)));
-    setSelected(new Set());
-    setBulkDeleteOpen(false);
-    success("Products removed", `${ids.length} products were deleted.`);
+    try {
+      await Promise.all(ids.map((id) => deleteProduct(id).unwrap()));
+      setSelected(new Set());
+      setBulkDeleteOpen(false);
+      toast.success("Products removed", `${ids.length} products were deleted.`);
+    } catch (err) {
+      toast.warning("Could not delete", getErrorMessage(err));
+    }
+  };
+
+  const markFeatured = async (value: boolean) => {
+    const ids = [...selected];
+    try {
+      await Promise.all(
+        ids.map((id) => updateProduct({ id, body: { isFeatured: value } }).unwrap())
+      );
+      value
+        ? toast.success("Featured", `${ids.length} products marked as featured.`)
+        : toast.info("Unfeatured", `${ids.length} products unfeatured.`);
+      setSelected(new Set());
+    } catch (err) {
+      toast.warning("Could not update", getErrorMessage(err));
+    }
   };
 
   const stockVariant = (stockCount: number) =>
@@ -109,7 +122,7 @@ export default function AdminProductsPage() {
       sortValue: (p) => p.name,
       render: (p) => (
         <div className="flex items-center gap-3">
-          <AdminAvatar name={p.name} src={p.images[0]} size="sm" />
+          <AdminAvatar name={p.name} src={p.images?.[0] ?? ""} size="sm" />
           <div className="min-w-0">
             <Link
               href={`/admin/products/${p.id}/edit`}
@@ -161,6 +174,16 @@ export default function AdminProductsPage() {
       ),
     },
     {
+      key: "position",
+      header: "Position",
+      align: "center",
+      sortable: true,
+      sortValue: (p) => p.position ?? 0,
+      render: (p) => (
+        <span className="text-sm text-muted-foreground">{p.position ?? 0}</span>
+      ),
+    },
+    {
       key: "rating",
       header: "Rating",
       align: "center",
@@ -183,6 +206,7 @@ export default function AdminProductsPage() {
         <button
           type="button"
           onClick={() => toggleFeatured(p)}
+          disabled={updating}
           aria-pressed={p.isFeatured}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
             p.isFeatured ? "bg-primary" : "bg-muted"
@@ -238,13 +262,13 @@ export default function AdminProductsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Products"
-        subtitle={`Manage your catalog — ${items.length} products total.`}
+        subtitle={`Manage your catalog — ${total} products total.`}
         breadcrumb={[{ label: "Products" }]}
         actions={
           <>
             <ExportButton
               filename="products"
-              data={filtered.map((p) => ({
+              data={items.map((p) => ({
                 Name: p.name,
                 SKU: p.sku,
                 Brand: p.brand,
@@ -254,7 +278,7 @@ export default function AdminProductsPage() {
                 Rating: p.rating,
                 Featured: p.isFeatured ? "Yes" : "No",
               }))}
-              disabled={!loaded || filtered.length === 0}
+              disabled={isLoading || items.length === 0}
             />
             <Button href="/admin/products/new" size="sm">
               <FiPlus className="h-4 w-4" aria-hidden />
@@ -325,48 +349,18 @@ export default function AdminProductsPage() {
 
       <DataTable<Product>
         columns={columns}
-        rows={pageItems}
+        rows={items}
         rowKey={(p) => p.id}
-        loading={!loaded}
+        loading={isLoading}
         selectable
         selectedKeys={selected}
         onSelectionChange={setSelected}
         bulkBar={
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const updated = items.map((p) =>
-                  selected.has(p.id) ? { ...p, isFeatured: true } : p
-                );
-                setItems(updated);
-                selected.forEach((id) => {
-                  const p = updated.find((item) => item.id === id);
-                  if (p) saveProduct(p);
-                });
-                success("Featured", `${selected.size} products marked as featured.`);
-                setSelected(new Set());
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={() => markFeatured(true)}>
               Mark featured
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const updated = items.map((p) =>
-                  selected.has(p.id) ? { ...p, isFeatured: false } : p
-                );
-                setItems(updated);
-                selected.forEach((id) => {
-                  const p = updated.find((item) => item.id === id);
-                  if (p) saveProduct(p);
-                });
-                info("Unfeatured", `${selected.size} products unfeatured.`);
-                setSelected(new Set());
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={() => markFeatured(false)}>
               Unfeature
             </Button>
             <Button
@@ -382,7 +376,7 @@ export default function AdminProductsPage() {
         pagination={{
           page,
           totalPages,
-          totalItems: filtered.length,
+          totalItems: total,
           pageSize,
           onPageChange: setPage,
           onPageSizeChange: handlePageSize,

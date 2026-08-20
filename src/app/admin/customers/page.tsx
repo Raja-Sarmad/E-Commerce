@@ -13,9 +13,8 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { useToast } from "@/context/ToastProvider";
-import { sampleUsers } from "@/lib/data/content";
-import { customerExtras, type CustomerExtras } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import { useGetUsersQuery } from "@/lib/rtk/adminApi";
 import { formatDate, formatNumber, formatPrice } from "@/lib/utils";
 import type { User } from "@/lib/types";
 
@@ -32,11 +31,21 @@ type TierVariant =
   | "info"
   | "outline";
 
-const tierVariants: Record<CustomerExtras["tier"], TierVariant> = {
+type CustomerTier = "Bronze" | "Silver" | "Gold" | "Platinum";
+
+const tierVariants: Record<CustomerTier, TierVariant> = {
   Bronze: "secondary",
   Silver: "default",
   Gold: "warning",
   Platinum: "primary",
+};
+
+type CustomerExtras = {
+  loyaltyPoints: number;
+  tier: CustomerTier;
+  notes: string;
+  status: "active" | "blocked";
+  cartHistory: { id: string; date: string; items: number; total: number; converted: boolean }[];
 };
 
 const defaultExtras = (): CustomerExtras => ({
@@ -50,36 +59,28 @@ const defaultExtras = (): CustomerExtras => ({
 type CustomerRow = User & { extras: CustomerExtras };
 
 export default function AdminCustomersPage() {
-  const { success, warning } = useToast();
   const [query, setQuery] = useState("");
   const [tier, setTier] = useState("all");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
-  const [extras, setExtras] = useState<Record<string, CustomerExtras>>(() => {
-    const base: Record<string, CustomerExtras> = {};
-    sampleUsers
-      .filter((u) => u.role !== "admin")
-      .forEach((u) => {
-        base[u.id] = customerExtras[u.id] ?? defaultExtras();
-      });
-    return base;
-  });
+  const [extras, setExtras] = useState<Record<string, CustomerExtras>>({});
   const [viewUser, setViewUser] = useState<User | null>(null);
 
-  const customers = useMemo(
-    () => sampleUsers.filter((u) => u.role !== "admin"),
-    []
-  );
+  const { data, isLoading } = useGetUsersQuery({
+    page,
+    limit: pageSize,
+    search: query || undefined,
+    role: "customer",
+  });
 
-  const rows = useMemo<CustomerRow[]>(
-    () =>
-      customers.map((u) => ({
-        ...u,
-        extras: extras[u.id] ?? defaultExtras(),
-      })),
-    [customers, extras]
-  );
+  const rows = useMemo<CustomerRow[]>(() => {
+    const items = data?.items ?? [];
+    return items.map((u) => ({
+      ...u,
+      extras: extras[u.id] ?? defaultExtras(),
+    }));
+  }, [data, extras]);
 
   const tiers = useMemo(
     () => [...new Set(rows.map((r) => r.extras.tier))].sort(),
@@ -87,20 +88,15 @@ export default function AdminCustomersPage() {
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return rows.filter((r) => {
-      const matchesQuery =
-        !q ||
-        r.name.toLowerCase().includes(q) ||
-        r.email.toLowerCase().includes(q);
       const matchesTier = tier === "all" || r.extras.tier === tier;
       const matchesStatus = status === "all" || r.extras.status === status;
-      return matchesQuery && matchesTier && matchesStatus;
+      return matchesTier && matchesStatus;
     });
-  }, [rows, query, tier, status]);
+  }, [rows, tier, status]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageItems = filtered;
 
   const handlePageSize = (size: number) => {
     setPageSize(size);
@@ -108,16 +104,16 @@ export default function AdminCustomersPage() {
   };
 
   const toggleBlock = (id: string, name: string) => {
-    const current = extras[id];
+    const current = extras[id] ?? defaultExtras();
     const nextStatus = current.status === "active" ? "blocked" : "active";
     setExtras((prev) => ({
       ...prev,
       [id]: { ...current, status: nextStatus },
     }));
     if (nextStatus === "blocked") {
-      warning("Customer blocked", `${name} can no longer place orders.`);
+      toast.warning("Customer blocked", `${name} can no longer place orders.`);
     } else {
-      success("Customer unblocked", `${name} can now place orders.`);
+      toast.success("Customer unblocked", `${name} can now place orders.`);
     }
   };
 
@@ -141,10 +137,10 @@ export default function AdminCustomersPage() {
       key: "joined",
       header: "Joined",
       sortable: true,
-      sortValue: (r) => r.joinedAt,
+      sortValue: (r) => (r as unknown as { createdAt?: string }).createdAt ?? "",
       render: (r) => (
         <span className="whitespace-nowrap text-muted-foreground">
-          {formatDate(r.joinedAt)}
+          {formatDate((r as unknown as { createdAt?: string }).createdAt ?? "")}
         </span>
       ),
     },
@@ -215,7 +211,7 @@ export default function AdminCustomersPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Customers"
-        subtitle={`Manage your registered customers — ${rows.length} customers total.`}
+        subtitle={`Manage your registered customers — ${data?.total ?? rows.length} customers total.`}
         breadcrumb={[{ label: "Customers" }]}
         actions={
           <ExportButton
@@ -223,7 +219,7 @@ export default function AdminCustomersPage() {
             data={filtered.map((r) => ({
               Name: r.name,
               Email: r.email,
-              Joined: formatDate(r.joinedAt),
+              Joined: formatDate((r as unknown as { createdAt?: string }).createdAt ?? ""),
               Orders: r.ordersCount,
               "Total spent": r.totalSpent,
               Tier: r.extras.tier,
@@ -277,25 +273,31 @@ export default function AdminCustomersPage() {
         }
       />
 
-      <DataTable<CustomerRow>
-        columns={columns}
-        rows={pageItems}
-        rowKey={(r) => r.id}
-        pagination={{
-          page,
-          totalPages,
-          totalItems: filtered.length,
-          pageSize,
-          onPageChange: setPage,
-          onPageSizeChange: handlePageSize,
-          pageSizeOptions: [8, 16, 24],
-        }}
-        empty={{
-          icon: <FiUsers className="h-7 w-7" aria-hidden />,
-          title: "No customers found",
-          description: "Try adjusting your search or filters.",
-        }}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-muted-foreground">
+          Loading customers…
+        </div>
+      ) : (
+        <DataTable<CustomerRow>
+          columns={columns}
+          rows={pageItems}
+          rowKey={(r) => r.id}
+          pagination={{
+            page,
+            totalPages,
+            totalItems: data?.total ?? filtered.length,
+            pageSize,
+            onPageChange: setPage,
+            onPageSizeChange: handlePageSize,
+            pageSizeOptions: [8, 16, 24],
+          }}
+          empty={{
+            icon: <FiUsers className="h-7 w-7" aria-hidden />,
+            title: "No customers found",
+            description: "Try adjusting your search or filters.",
+          }}
+        />
+      )}
 
       <Modal
         open={viewUser !== null}
@@ -317,7 +319,7 @@ export default function AdminCustomersPage() {
                     <StatusBadge status={viewExtras.status} />
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Joined {formatDate(viewUser.joinedAt)} · {viewUser.ordersCount} orders ·{" "}
+                    Joined {formatDate((viewUser as unknown as { createdAt?: string }).createdAt ?? "")} · {viewUser.ordersCount} orders ·{" "}
                     <span className="font-semibold text-foreground">
                       {formatPrice(viewUser.totalSpent)}
                     </span>{" "}

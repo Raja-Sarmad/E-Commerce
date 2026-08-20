@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Badge } from "@/components/ui/Badge";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
+import { useProductReviews } from "@/hooks/use-catalog";
 import type { Product } from "@/lib/types";
 import { formatDate, timeAgo } from "@/lib/utils";
 
@@ -16,10 +17,12 @@ type ReviewsSectionProps = {
 };
 
 export function ReviewsSection({ product }: ReviewsSectionProps) {
-  const { success } = useToast();
-  const [reviews, setReviews] = useState(product.reviews);
+  const { data: serverReviews = [] } = useProductReviews(product.id);
+  const [localReviews, setLocalReviews] = useState(product.reviews ?? []);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState({ name: "", rating: 5, title: "", body: "" });
+
+  const reviews = serverReviews.length > 0 ? serverReviews : localReviews;
 
   const breakdown = useMemo(() => {
     const buckets = [5, 4, 3, 2, 1].map((star) => {
@@ -47,10 +50,10 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
       verified: true,
       helpful: 0,
     };
-    setReviews((prev) => [review, ...prev]);
+    setLocalReviews((prev) => [review, ...prev]);
     setFormOpen(false);
     setForm({ name: "", rating: 5, title: "", body: "" });
-    success("Review submitted", "Thank you for your feedback!");
+    toast.success("Review submitted", "Thank you for your feedback!");
   };
 
   return (

@@ -24,24 +24,24 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import {
-  adminBlogPosts,
-  blogCategories,
-  generateId,
-} from "@/lib/data/admin";
-import type {
-  AdminBlogPost,
-  BlogPostStatus,
-} from "@/lib/data/admin";
+  useGetAdminBlogPostsQuery,
+  useCreateBlogPostMutation,
+  useUpdateBlogPostMutation,
+  useDeleteBlogPostMutation,
+  type AdminBlogPost,
+} from "@/lib/rtk/adminApi";
 import { formatDate, formatNumber, slugify } from "@/lib/utils";
 
 const PER_PAGE = 8;
 
+const blogCategories = ["Buying Guides", "Beauty & Care", "Home & Living", "Fashion", "Sports & Outdoors", "Lifestyle"];
+
 type BlogForm = {
   title: string;
   category: string;
-  status: BlogPostStatus;
+  status: string;
   coverImage: string;
   excerpt: string;
   content: string;
@@ -59,8 +59,6 @@ const emptyForm: BlogForm = {
 };
 
 export default function AdminBlogPage() {
-  const { success, warning } = useToast();
-  const [items, setItems] = useState<AdminBlogPost[]>(adminBlogPosts);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -70,6 +68,13 @@ export default function AdminBlogPage() {
   const [editing, setEditing] = useState<AdminBlogPost | null>(null);
   const [form, setForm] = useState<BlogForm>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<AdminBlogPost | null>(null);
+
+  const { data, isLoading } = useGetAdminBlogPostsQuery({});
+  const [createBlogPost] = useCreateBlogPostMutation();
+  const [updateBlogPost] = useUpdateBlogPostMutation();
+  const [deleteBlogPost] = useDeleteBlogPostMutation();
+
+  const items = useMemo(() => data?.items ?? [], [data]);
 
   const categories = useMemo(
     () => [...new Set(items.map((p) => p.category))].sort(),
@@ -114,71 +119,69 @@ export default function AdminBlogPage() {
       status: post.status,
       coverImage: post.coverImage,
       excerpt: post.excerpt,
-      content: post.content.join("\n"),
+      content: Array.isArray(post.content) ? post.content.join("\n") : post.content,
       featured: !!post.featured,
     });
     setFormOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     const title = form.title.trim();
     if (!title) {
-      warning("Title required", "Please enter a post title.");
+      toast.warning("Title required", "Please enter a post title.");
       return;
     }
     const paragraphs = form.content
       .split("\n")
       .map((p) => p.trim())
       .filter(Boolean);
-    if (editing) {
-      const updated: AdminBlogPost = {
-        ...editing,
-        title,
-        category: form.category,
-        status: form.status,
-        coverImage: form.coverImage.trim() || editing.coverImage,
-        excerpt: form.excerpt.trim(),
-        content: paragraphs,
-        featured: form.featured,
-      };
-      setItems((prev) => prev.map((p) => (p.id === editing.id ? updated : p)));
-      success("Post saved", `“${updated.title}” was updated.`);
-    } else {
-      const slug = slugify(title);
-      const created: AdminBlogPost = {
-        id: generateId("bl"),
-        slug,
-        title,
-        excerpt: form.excerpt.trim(),
-        content: paragraphs,
-        coverImage:
-          form.coverImage.trim() ||
-          `https://picsum.photos/seed/blog-${slug}/900/520`,
-        category: form.category,
-        author: "Admin",
-        authorAvatar: "",
-        date: new Date().toISOString(),
-        readTime: Math.max(
-          1,
-          Math.round(
-            paragraphs.join(" ").split(/\s+/).filter(Boolean).length / 200
-          )
-        ),
-        tags: [],
-        featured: form.featured,
-        status: form.status,
-        views: 0,
-      };
-      setItems((prev) => [...prev, created]);
-      success("Post created", `“${created.title}” was added.`);
+    const slug = slugify(title);
+    try {
+      if (editing) {
+        await updateBlogPost({
+          id: editing._id,
+          body: {
+            title,
+            slug,
+            category: form.category,
+            status: form.status,
+            coverImage: form.coverImage.trim() || editing.coverImage,
+            excerpt: form.excerpt.trim(),
+            content: paragraphs.join("\n"),
+            featured: form.featured,
+          },
+        }).unwrap();
+        toast.success("Post saved", `"${title}" was updated.`);
+      } else {
+        await createBlogPost({
+          title,
+          slug,
+          excerpt: form.excerpt.trim(),
+          content: paragraphs.join("\n"),
+          coverImage:
+            form.coverImage.trim() ||
+            `https://picsum.photos/seed/blog-${slug}/900/520`,
+          category: form.category,
+          author: "Admin",
+          featured: form.featured,
+          status: form.status,
+        }).unwrap();
+        toast.success("Post created", `"${title}" was added.`);
+      }
+      setFormOpen(false);
+    } catch {
+      toast.error("Error", "Something went wrong. Please try again.");
     }
-    setFormOpen(false);
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-    success("Post removed", `“${deleteTarget.title}” was deleted.`);
+    try {
+      await deleteBlogPost(deleteTarget._id).unwrap();
+      toast.success("Post removed", `"${deleteTarget.title}" was deleted.`);
+    } catch {
+      toast.error("Error", "Failed to delete post.");
+    }
     setDeleteTarget(null);
   };
 
@@ -253,10 +256,10 @@ export default function AdminBlogPage() {
       header: "Date",
       align: "right",
       sortable: true,
-      sortValue: (p) => p.date,
+      sortValue: (p) => p.createdAt,
       render: (p) => (
         <span className="whitespace-nowrap text-muted-foreground">
-          {formatDate(p.date)}
+          {formatDate(p.createdAt)}
         </span>
       ),
     },
@@ -298,7 +301,7 @@ export default function AdminBlogPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Blog"
-        subtitle={`Manage your articles — ${items.length} posts total.`}
+        subtitle={`Manage your articles — ${data?.total ?? items.length} posts total.`}
         breadcrumb={[{ label: "Blog" }]}
         actions={
           <>
@@ -312,7 +315,7 @@ export default function AdminBlogPage() {
                 Status: p.status,
                 Views: p.views,
                 Featured: p.featured ? "Yes" : "No",
-                Date: p.date,
+                Date: p.createdAt,
               }))}
               disabled={filtered.length === 0}
             />
@@ -403,34 +406,40 @@ export default function AdminBlogPage() {
         }
       />
 
-      <DataTable<AdminBlogPost>
-        columns={columns}
-        rows={pageItems}
-        rowKey={(p) => p.id}
-        pagination={{
-          page,
-          totalPages,
-          totalItems: filtered.length,
-          pageSize,
-          onPageChange: setPage,
-          onPageSizeChange: handlePageSize,
-          pageSizeOptions: [8, 16, 24],
-        }}
-        empty={{
-          icon: <FiFileText className="h-7 w-7" aria-hidden />,
-          title: "No posts found",
-          description: "Try adjusting your search or filters, or create a new post.",
-          actionLabel: "Add post",
-          onAction: openAdd,
-        }}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-muted-foreground">
+          Loading posts…
+        </div>
+      ) : (
+        <DataTable<AdminBlogPost>
+          columns={columns}
+          rows={pageItems}
+          rowKey={(p) => p._id}
+          pagination={{
+            page,
+            totalPages,
+            totalItems: filtered.length,
+            pageSize,
+            onPageChange: setPage,
+            onPageSizeChange: handlePageSize,
+            pageSizeOptions: [8, 16, 24],
+          }}
+          empty={{
+            icon: <FiFileText className="h-7 w-7" aria-hidden />,
+            title: "No posts found",
+            description: "Try adjusting your search or filters, or create a new post.",
+            actionLabel: "Add post",
+            onAction: openAdd,
+          }}
+        />
+      )}
 
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? "Edit post" : "Add post"}
         subtitle={
-          editing ? `Update “${editing.title}”.` : "Create a new blog post."
+          editing ? `Update "${editing.title}".` : "Create a new blog post."
         }
         size="lg"
       >
@@ -457,7 +466,7 @@ export default function AdminBlogPage() {
               label="Status"
               value={form.status}
               onChange={(e) =>
-                setForm({ ...form, status: e.target.value as BlogPostStatus })
+                setForm({ ...form, status: e.target.value })
               }
             >
               <option value="published">Published</option>
@@ -525,7 +534,7 @@ export default function AdminBlogPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={remove}
         title="Delete post?"
-        description={`This will permanently remove “${deleteTarget?.title}”. This action cannot be undone.`}
+        description={`This will permanently remove "${deleteTarget?.title}". This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>

@@ -6,12 +6,11 @@ import { FiEye, FiEyeOff, FiLock, FiMail, FiUser } from "react-icons/fi";
 import { AuthShell, AuthFooter } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { useAuth } from "@/context/AuthProvider";
-import { useToast } from "@/context/ToastProvider";
+import { useRegisterMutation } from "@/lib/rtk/authApi";
+import { toast } from "@/hooks/use-toast";
 
 export default function RegisterPage() {
-  const { register } = useAuth();
-  const { success } = useToast();
+  const [registerMutation] = useRegisterMutation();
   const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -38,10 +37,14 @@ export default function RegisterPage() {
       return;
     }
     setLoading(true);
-    await register(form.name, form.email, form.password);
+    try {
+      await registerMutation({ name: form.name, email: form.email, password: form.password }).unwrap();
+      toast.success("Account created!", "Welcome to NovaMart.");
+      router.push("/account/profile");
+    } catch {
+      setFormError("Registration failed. Please try again.");
+    }
     setLoading(false);
-    success("Account created!", "Welcome to NovaMart.");
-    router.push("/account/profile");
   };
 
   return (

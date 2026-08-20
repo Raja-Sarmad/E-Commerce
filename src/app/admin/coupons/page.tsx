@@ -12,11 +12,15 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { useToast } from "@/context/ToastProvider";
-import { coupons as seedCoupons } from "@/lib/data/content";
-import { couponUsage } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminCouponsQuery,
+  useCreateCouponMutation,
+  useUpdateCouponMutation,
+  useDeleteCouponMutation,
+  type AdminCoupon,
+} from "@/lib/rtk/adminApi";
 import { formatDate, formatNumber, formatPrice } from "@/lib/utils";
-import type { Coupon } from "@/lib/types";
 
 const PER_PAGE = 8;
 
@@ -41,19 +45,21 @@ const emptyForm: CouponForm = {
 };
 
 export default function AdminCouponsPage() {
-  const { success, info, warning } = useToast();
-  const [items, setItems] = useState<Coupon[]>(seedCoupons);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Coupon | null>(null);
+  const [editing, setEditing] = useState<AdminCoupon | null>(null);
   const [form, setForm] = useState<CouponForm>(emptyForm);
-  const [deleteTarget, setDeleteTarget] = useState<Coupon | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminCoupon | null>(null);
 
-  const usageFor = (code: string) =>
-    couponUsage[code] ?? { used: 0, limit: 100, revenue: 0 };
+  const { data, isLoading } = useGetAdminCouponsQuery({});
+  const [createCoupon, { isLoading: isCreating }] = useCreateCouponMutation();
+  const [updateCoupon, { isLoading: isUpdating }] = useUpdateCouponMutation();
+  const [deleteCoupon, { isLoading: isDeleting }] = useDeleteCouponMutation();
+
+  const items = data?.items ?? [];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -73,43 +79,43 @@ export default function AdminCouponsPage() {
     setFormOpen(true);
   };
 
-  const openEdit = (coupon: Coupon) => {
+  const openEdit = (coupon: AdminCoupon) => {
     setEditing(coupon);
     setForm({
       code: coupon.code,
-      type: coupon.type,
+      type: coupon.type as "percentage" | "fixed",
       value: String(coupon.value),
       minSpend: String(coupon.minSpend),
-      maxDiscount: coupon.maxDiscount !== undefined ? String(coupon.maxDiscount) : "",
-      expiresAt: coupon.expiresAt.slice(0, 10),
+      maxDiscount: coupon.maxDiscount ? String(coupon.maxDiscount) : "",
+      expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 10) : "",
       active: coupon.active,
     });
     setFormOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     const code = form.code.trim().toUpperCase();
     const value = Number(form.value);
     const minSpend = Number(form.minSpend);
     const maxDiscount = form.maxDiscount.trim() ? Number(form.maxDiscount) : undefined;
     if (!code) {
-      warning("Code required", "Please enter a coupon code.");
+      toast.warning("Code required", "Please enter a coupon code.");
       return;
     }
     if (!form.value || Number.isNaN(value) || value <= 0) {
-      warning("Invalid value", "Discount value must be a positive number.");
+      toast.warning("Invalid value", "Discount value must be a positive number.");
       return;
     }
     if (Number.isNaN(minSpend) || minSpend < 0) {
-      warning("Invalid minimum spend", "Minimum spend must be zero or more.");
+      toast.warning("Invalid minimum spend", "Minimum spend must be zero or more.");
       return;
     }
     if (!form.expiresAt) {
-      warning("Expiry required", "Please choose an expiration date.");
+      toast.warning("Expiry required", "Please choose an expiration date.");
       return;
     }
     if (items.some((c) => c.code.toLowerCase() === code.toLowerCase() && c.code !== editing?.code)) {
-      warning("Duplicate code", "A coupon with this code already exists.");
+      toast.warning("Duplicate code", "A coupon with this code already exists.");
       return;
     }
     const base = {
@@ -120,34 +126,42 @@ export default function AdminCouponsPage() {
       expiresAt: `${form.expiresAt}T00:00:00Z`,
       active: form.active,
     };
-    if (editing) {
-      const updated: Coupon = { ...editing, code, ...base };
-      setItems((prev) => prev.map((c) => (c.code === editing.code ? updated : c)));
-      success("Coupon updated", `Coupon “${updated.code}” was saved.`);
-    } else {
-      const created: Coupon = { code, ...base };
-      setItems((prev) => [...prev, created]);
-      success("Coupon created", `Coupon “${created.code}” was added.`);
+    try {
+      if (editing) {
+        await updateCoupon({ id: editing._id, body: { code, ...base } }).unwrap();
+        toast.success("Coupon updated", `Coupon "${code}" was saved.`);
+      } else {
+        await createCoupon({ code, ...base }).unwrap();
+        toast.success("Coupon created", `Coupon "${code}" was added.`);
+      }
+      setFormOpen(false);
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "data" in err ? String((err as { data?: unknown }).data) : String(err);
+      toast.error("Error", msg || "Something went wrong.");
     }
-    setFormOpen(false);
   };
 
-  const toggleActive = (coupon: Coupon) => {
-    const updated = { ...coupon, active: !coupon.active };
-    setItems((prev) =>
-      prev.map((c) => (c.code === coupon.code ? updated : c))
-    );
-    info(
-      updated.active ? "Activated" : "Deactivated",
-      `Coupon “${updated.code}” is now ${updated.active ? "active" : "inactive"}.`
-    );
+  const toggleActive = async (coupon: AdminCoupon) => {
+    try {
+      await updateCoupon({ id: coupon._id, body: { active: !coupon.active } }).unwrap();
+      toast.info(
+        !coupon.active ? "Activated" : "Deactivated",
+        `Coupon "${coupon.code}" is now ${!coupon.active ? "active" : "inactive"}.`
+      );
+    } catch {
+      toast.error("Error", "Failed to update coupon status.");
+    }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((c) => c.code !== deleteTarget.code));
-    success("Coupon removed", `Coupon “${deleteTarget.code}” was deleted.`);
-    setDeleteTarget(null);
+    try {
+      await deleteCoupon(deleteTarget._id).unwrap();
+      toast.success("Coupon removed", `Coupon "${deleteTarget.code}" was deleted.`);
+      setDeleteTarget(null);
+    } catch {
+      toast.error("Error", "Failed to delete coupon.");
+    }
   };
 
   const handlePageSize = (size: number) => {
@@ -155,10 +169,10 @@ export default function AdminCouponsPage() {
     setPage(1);
   };
 
-  const valueLabel = (coupon: Coupon) =>
+  const valueLabel = (coupon: AdminCoupon) =>
     coupon.type === "percentage" ? `${coupon.value}%` : formatPrice(coupon.value);
 
-  const columns: Column<Coupon>[] = [
+  const columns: Column<AdminCoupon>[] = [
     {
       key: "code",
       header: "Code",
@@ -190,7 +204,7 @@ export default function AdminCouponsPage() {
       render: (c) => (
         <div className="text-right">
           <p className="font-semibold text-foreground">{valueLabel(c)}</p>
-          {c.maxDiscount !== undefined && c.type === "percentage" && (
+          {c.maxDiscount > 0 && c.type === "percentage" && (
             <p className="text-xs text-muted-foreground">
               up to {formatPrice(c.maxDiscount)}
             </p>
@@ -214,13 +228,9 @@ export default function AdminCouponsPage() {
       key: "usage",
       header: "Usage",
       sortable: true,
-      sortValue: (c) => {
-        const u = usageFor(c.code);
-        return u.limit > 0 ? u.used / u.limit : 0;
-      },
+      sortValue: (c) => (c.maxUses > 0 ? c.usedCount / c.maxUses : 0),
       render: (c) => {
-        const u = usageFor(c.code);
-        const pct = u.limit > 0 ? Math.min(100, (u.used / u.limit) * 100) : 0;
+        const pct = c.maxUses > 0 ? Math.min(100, (c.usedCount / c.maxUses) * 100) : 0;
         return (
           <div className="w-32">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -230,32 +240,20 @@ export default function AdminCouponsPage() {
               />
             </div>
             <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
-              {formatNumber(u.used)} / {formatNumber(u.limit)}
+              {formatNumber(c.usedCount)} / {formatNumber(c.maxUses)}
             </p>
           </div>
         );
       },
     },
     {
-      key: "revenue",
-      header: "Revenue",
-      align: "right",
-      sortable: true,
-      sortValue: (c) => usageFor(c.code).revenue,
-      render: (c) => (
-        <span className="whitespace-nowrap font-medium text-foreground">
-          {formatPrice(usageFor(c.code).revenue)}
-        </span>
-      ),
-    },
-    {
       key: "expires",
       header: "Expires",
       sortable: true,
-      sortValue: (c) => c.expiresAt,
+      sortValue: (c) => c.expiresAt ?? "",
       render: (c) => (
         <span className="whitespace-nowrap text-muted-foreground">
-          {formatDate(c.expiresAt)}
+          {c.expiresAt ? formatDate(c.expiresAt) : "—"}
         </span>
       ),
     },
@@ -324,10 +322,9 @@ export default function AdminCouponsPage() {
                 Type: c.type,
                 Value: valueLabel(c),
                 MinSpend: c.minSpend,
-                Used: usageFor(c.code).used,
-                Limit: usageFor(c.code).limit,
-                Revenue: usageFor(c.code).revenue,
-                Expires: formatDate(c.expiresAt),
+                Used: c.usedCount,
+                Limit: c.maxUses,
+                Expires: c.expiresAt ? formatDate(c.expiresAt) : "",
                 Active: c.active ? "Yes" : "No",
               }))}
               disabled={filtered.length === 0}
@@ -364,10 +361,10 @@ export default function AdminCouponsPage() {
         }
       />
 
-      <DataTable<Coupon>
+      <DataTable<AdminCoupon>
         columns={columns}
         rows={pageItems}
-        rowKey={(c) => c.code}
+        rowKey={(c) => c._id}
         pagination={{
           page,
           totalPages,
@@ -391,7 +388,7 @@ export default function AdminCouponsPage() {
         onClose={() => setFormOpen(false)}
         title={editing ? "Edit coupon" : "Add coupon"}
         subtitle={
-          editing ? `Update “${editing.code}”.` : "Create a new discount code."
+          editing ? `Update "${editing.code}".` : "Create a new discount code."
         }
         size="lg"
       >
@@ -468,7 +465,7 @@ export default function AdminCouponsPage() {
             <Button variant="outline" onClick={() => setFormOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={save}>
+            <Button onClick={save} disabled={isCreating || isUpdating}>
               {editing ? "Save changes" : "Add coupon"}
             </Button>
           </div>
@@ -480,7 +477,7 @@ export default function AdminCouponsPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={remove}
         title="Delete coupon?"
-        description={`This will permanently remove coupon “${deleteTarget?.code}”. This action cannot be undone.`}
+        description={`This will permanently remove coupon "${deleteTarget?.code}". This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>

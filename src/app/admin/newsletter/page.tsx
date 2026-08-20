@@ -15,12 +15,22 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { useToast } from "@/context/ToastProvider";
-import { subscribers, emailTemplates, type Subscriber } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminSubscribersQuery,
+  useDeleteSubscriberMutation,
+  type AdminSubscriber,
+} from "@/lib/rtk/adminApi";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const PER_PAGE = 8;
+
+const emailTemplates = [
+  { id: "1", name: "Welcome", subject: "Welcome to NovaMart!", description: "Sent when a user subscribes.", category: "Onboarding", updatedAt: "2025-01-15T10:00:00Z" },
+  { id: "2", name: "Weekly Digest", subject: "This week at NovaMart", description: "Weekly summary of deals and new arrivals.", category: "Marketing", updatedAt: "2025-03-01T10:00:00Z" },
+  { id: "3", name: "Promo Blast", subject: "Don't miss our latest sale!", description: "Promotional email for seasonal campaigns.", category: "Promotions", updatedAt: "2025-02-20T10:00:00Z" },
+];
 
 function StatCard({
   icon,
@@ -54,8 +64,6 @@ function StatCard({
 }
 
 export default function AdminNewsletterPage() {
-  const { success, info, warning } = useToast();
-  const [items, setItems] = useState<Subscriber[]>(subscribers);
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("all");
   const [status, setStatus] = useState("all");
@@ -64,6 +72,11 @@ export default function AdminNewsletterPage() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+
+  const { data: subscribersData, isLoading } = useGetAdminSubscribersQuery({});
+  const [deleteSubscriber] = useDeleteSubscriberMutation();
+
+  const items = useMemo(() => subscribersData?.items ?? [], [subscribersData]);
 
   const sources = useMemo(
     () => [...new Set(items.map((s) => s.source))].sort(),
@@ -96,32 +109,27 @@ export default function AdminNewsletterPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const toggleStatus = (subscriber: Subscriber) => {
-    const updated: Subscriber = {
-      ...subscriber,
-      status: subscriber.status === "active" ? "unsubscribed" : "active",
-    };
-    setItems((prev) =>
-      prev.map((s) => (s.id === subscriber.id ? updated : s))
-    );
-    info(
-      updated.status === "active" ? "Resubscribed" : "Unsubscribed",
-      `${subscriber.email} is now ${updated.status}.`
-    );
+  const handleDelete = async (subscriber: AdminSubscriber) => {
+    try {
+      await deleteSubscriber(subscriber._id).unwrap();
+      toast.success("Subscriber removed", `${subscriber.email} has been removed.`);
+    } catch {
+      toast.error("Failed", "Could not remove subscriber.");
+    }
   };
 
   const sendCompose = () => {
     if (!subject.trim() || !message.trim()) {
-      warning("Missing fields", "Please add both a subject and a message.");
+      toast.warning("Missing fields", "Please add both a subject and a message.");
       return;
     }
-    success("Email queued", `“${subject.trim()}” will be sent to all subscribers.`);
+    toast.success("Email queued", `"${subject.trim()}" will be sent to all subscribers.`);
     setSubject("");
     setMessage("");
     setComposeOpen(false);
   };
 
-  const columns: Column<Subscriber>[] = [
+  const columns: Column<AdminSubscriber>[] = [
     {
       key: "subscriber",
       header: "Subscriber",
@@ -151,8 +159,8 @@ export default function AdminNewsletterPage() {
       key: "subscribed",
       header: "Subscribed",
       sortable: true,
-      sortValue: (s) => s.subscribedAt,
-      render: (s) => <span className="text-muted-foreground">{formatDate(s.subscribedAt)}</span>,
+      sortValue: (s) => s.createdAt,
+      render: (s) => <span className="text-muted-foreground">{formatDate(s.createdAt)}</span>,
     },
     {
       key: "status",
@@ -171,7 +179,7 @@ export default function AdminNewsletterPage() {
             variant="outline"
             size="xs"
             leftIcon={<FiX className="h-3.5 w-3.5" aria-hidden />}
-            onClick={() => toggleStatus(s)}
+            onClick={() => handleDelete(s)}
           >
             Unsubscribe
           </Button>
@@ -180,9 +188,9 @@ export default function AdminNewsletterPage() {
             variant="success"
             size="xs"
             leftIcon={<FiCheck className="h-3.5 w-3.5" aria-hidden />}
-            onClick={() => toggleStatus(s)}
+            onClick={() => handleDelete(s)}
           >
-            Resubscribe
+            Remove
           </Button>
         ),
     },
@@ -202,7 +210,7 @@ export default function AdminNewsletterPage() {
                 Name: s.name,
                 Email: s.email,
                 Source: s.source,
-                Subscribed: s.subscribedAt,
+                Subscribed: s.createdAt,
                 Status: s.status,
               }))}
               disabled={filtered.length === 0}
@@ -284,10 +292,10 @@ export default function AdminNewsletterPage() {
         }
       />
 
-      <DataTable<Subscriber>
+      <DataTable<AdminSubscriber>
         columns={columns}
         rows={pageItems}
-        rowKey={(s) => s.id}
+        rowKey={(s) => s._id}
         pagination={{
           page,
           totalPages,

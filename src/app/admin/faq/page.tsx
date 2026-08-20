@@ -14,22 +14,23 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
-import { useToast } from "@/context/ToastProvider";
-import { adminFaqs, faqCategories, generateId, type AdminFaq } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminFaqsQuery,
+  useCreateFaqMutation,
+  useUpdateFaqMutation,
+  useDeleteFaqMutation,
+  type AdminFaq,
+} from "@/lib/rtk/adminApi";
+import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
-const PER_PAGE = 8;
+type FaqItem = AdminFaq;
 
-type FaqForm = {
-  category: string;
-  question: string;
-  answer: string;
-  order: string;
-  active: boolean;
-};
+const faqCategories = ["Orders & Shipping", "Returns & Refunds", "Payments", "Account", "Products"];
 
-const emptyForm: FaqForm = {
+const emptyForm = {
   category: faqCategories[0],
   question: "",
   answer: "",
@@ -69,16 +70,21 @@ function StatCard({
 }
 
 export default function AdminFaqPage() {
-  const { success, info, warning } = useToast();
-  const [items, setItems] = useState<AdminFaq[]>(adminFaqs);
+  const { data, isLoading } = useGetAdminFaqsQuery({});
+  const [createFaq] = useCreateFaqMutation();
+  const [updateFaq] = useUpdateFaqMutation();
+  const [deleteFaq] = useDeleteFaqMutation();
+
+  const items: FaqItem[] = data?.items ?? [];
+
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PER_PAGE);
+  const [pageSize, setPageSize] = useState(8);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FaqForm>(emptyForm);
-  const [deleteTarget, setDeleteTarget] = useState<AdminFaq | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState<FaqItem | null>(null);
 
   const stats = useMemo(
     () => ({
@@ -110,7 +116,7 @@ export default function AdminFaqPage() {
     setFormOpen(true);
   };
 
-  const openEdit = (faq: AdminFaq) => {
+  const openEdit = (faq: FaqItem) => {
     setForm({
       category: faq.category,
       question: faq.question,
@@ -118,64 +124,72 @@ export default function AdminFaqPage() {
       order: String(faq.order),
       active: faq.active,
     });
-    setEditingId(faq.id);
+    setEditingId(faq._id);
     setFormOpen(true);
   };
 
-  const saveFaq = () => {
+  const saveFaq = async () => {
     if (!form.question.trim() || !form.answer.trim()) {
-      warning("Missing fields", "Question and answer are required.");
+      toast.warning("Missing fields", "Question and answer are required.");
       return;
     }
     const order = Number(form.order) || 0;
-    if (editingId) {
-      setItems((prev) =>
-        prev.map((f) =>
-          f.id === editingId
-            ? {
-                ...f,
-                category: form.category,
-                question: form.question.trim(),
-                answer: form.answer.trim(),
-                order,
-                active: form.active,
-              }
-            : f
-        )
-      );
-      success("FAQ updated", "The FAQ entry was updated.");
-    } else {
-      const created: AdminFaq = {
-        id: generateId("fq"),
-        category: form.category,
-        question: form.question.trim(),
-        answer: form.answer.trim(),
-        order,
-        active: form.active,
-      };
-      setItems((prev) => [...prev, created]);
-      success("FAQ added", "A new FAQ entry was created.");
+    try {
+      if (editingId) {
+        await updateFaq({
+          id: editingId,
+          body: {
+            category: form.category,
+            question: form.question.trim(),
+            answer: form.answer.trim(),
+            order,
+            active: form.active,
+          },
+        }).unwrap();
+        toast.success("FAQ updated", "The FAQ entry was updated.");
+      } else {
+        await createFaq({
+          category: form.category,
+          question: form.question.trim(),
+          answer: form.answer.trim(),
+          order,
+          active: form.active,
+        }).unwrap();
+        toast.success("FAQ added", "A new FAQ entry was created.");
+      }
+      setFormOpen(false);
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
     }
-    setFormOpen(false);
   };
 
-  const toggleActive = (faq: AdminFaq) => {
-    const updated = { ...faq, active: !faq.active };
-    setItems((prev) => prev.map((f) => (f.id === faq.id ? updated : f)));
-    info(
-      updated.active ? "FAQ activated" : "FAQ deactivated",
-      `“${faq.question}” is now ${updated.active ? "visible" : "hidden"}.`
-    );
+  const toggleActive = async (faq: FaqItem) => {
+    try {
+      await updateFaq({
+        id: faq._id,
+        body: { active: !faq.active },
+      }).unwrap();
+      toast.info(
+        !faq.active ? "FAQ activated" : "FAQ deactivated",
+        `"${faq.question}" is now ${!faq.active ? "visible" : "hidden"}.`
+      );
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
+    }
   };
 
-  const removeFaq = () => {
+  const removeFaq = async () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((f) => f.id !== deleteTarget.id));
-    setDeleteTarget(null);
-    success("FAQ deleted", `“${deleteTarget.question}” was removed.`);
+    try {
+      await deleteFaq(deleteTarget._id).unwrap();
+      setDeleteTarget(null);
+      toast.success("FAQ deleted", `"${deleteTarget.question}" was removed.`);
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
+    }
   };
 
-  const columns: Column<AdminFaq>[] = [
+  const columns: Column<FaqItem>[] = [
     {
       key: "category",
       header: "Category",
@@ -333,10 +347,10 @@ export default function AdminFaqPage() {
         }
       />
 
-      <DataTable<AdminFaq>
+      <DataTable<FaqItem>
         columns={columns}
         rows={pageItems}
-        rowKey={(f) => f.id}
+        rowKey={(f) => f._id}
         pagination={{
           page,
           totalPages,
@@ -435,7 +449,7 @@ export default function AdminFaqPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={removeFaq}
         title="Delete FAQ?"
-        description={`This will permanently remove “${deleteTarget?.question}” from your help center. This action cannot be undone.`}
+        description={`This will permanently remove "${deleteTarget?.question}" from your help center. This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>

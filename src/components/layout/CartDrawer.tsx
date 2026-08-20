@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { FiTrash2, FiMinus, FiPlus } from "react-icons/fi";
+import { useSelector, useDispatch } from "react-redux";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductImage } from "@/components/ui/ProductImage";
-import { useCart } from "@/context/CartProvider";
+import { selectCartItems, selectCartCount, selectCartTotals, updateQuantity, removeItem } from "@/lib/rtk/cartSlice";
 import { formatPrice } from "@/lib/utils";
 
 type CartDrawerProps = {
@@ -15,7 +16,10 @@ type CartDrawerProps = {
 };
 
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
-  const { items, count, subtotal, updateQuantity, removeItem } = useCart();
+  const items = useSelector(selectCartItems);
+  const count = useSelector(selectCartCount);
+  const { subtotal } = useSelector(selectCartTotals);
+  const dispatch = useDispatch();
 
   return (
     <Drawer
@@ -75,7 +79,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                 className="shrink-0"
               >
                 <ProductImage
-                  src={item.product.images[0]}
+                  src={item.product.images?.[0] ?? ""}
                   alt={item.product.name}
                   className="h-20 w-20 rounded-lg"
                   imgClassName="rounded-lg"
@@ -92,7 +96,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => removeItem(item.product.id)}
+                    onClick={() => dispatch(removeItem(item.product.id))}
                     aria-label={`Remove ${item.product.name} from cart`}
                     className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
@@ -119,7 +123,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        updateQuantity(item.product.id, item.quantity - 1)
+                        dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity - 1 }))
                       }
                       aria-label="Decrease quantity"
                       className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"
@@ -132,7 +136,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        updateQuantity(item.product.id, item.quantity + 1)
+                        dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity + 1 }))
                       }
                       aria-label="Increase quantity"
                       className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"

@@ -20,9 +20,18 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { ProductImage } from "@/components/ui/ProductImage";
-import { useCart } from "@/context/CartProvider";
-import { useAuth } from "@/context/AuthProvider";
-import { useToast } from "@/context/ToastProvider";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  selectCartItems,
+  selectCartTotals,
+  selectCartCoupon,
+  clearCart,
+} from "@/lib/rtk/cartSlice";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
+import { toast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useCreateOrderMutation } from "@/lib/rtk/authApi";
+import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { saveOrder, generateOrderNumber } from "@/lib/orders-store";
 import type { Address, Order } from "@/lib/types";
 import { siteConfig } from "@/lib/site";
@@ -60,9 +69,14 @@ const emptyAddress: Address = {
 };
 
 export default function CheckoutPage() {
-  const { items, subtotal, discount, shipping: cartShipping, tax, total, coupon, clearCart } = useCart();
-  const { user } = useAuth();
-  const { success } = useToast();
+  const dispatch = useDispatch();
+  const items = useSelector(selectCartItems);
+  const { subtotal, discount, shipping: cartShipping, tax, total } = useSelector(selectCartTotals);
+  const coupon = useSelector(selectCartCoupon);
+  const { data: user } = useGetMeQuery();
+  const isAuthenticated = Boolean(user);
+  const { isAdmin } = useIsAdmin();
+  const [createOrder, { isLoading: creatingOrder }] = useCreateOrderMutation();
   const router = useRouter();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -78,6 +92,10 @@ export default function CheckoutPage() {
 
   const delivery = deliveryOptions.find((d) => d.id === deliveryId) ?? deliveryOptions[0];
   const totalWithDelivery = total + delivery.price;
+
+  useEffect(() => {
+    if (isAdmin) router.replace("/admin");
+  }, [isAdmin, router]);
 
   useEffect(() => {
     if (items.length === 0 && step > 1) {
@@ -129,9 +147,31 @@ export default function CheckoutPage() {
     if (step > 1) setStep((s) => (s - 1) as 1 | 2 | 3);
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!cardValid) return;
     setProcessing(true);
+
+    const payload = {
+      items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+      couponCode: coupon?.code ?? undefined,
+      shippingAddress: sameAsBilling ? shippingAddress : { ...shippingAddress },
+      billingAddress: sameAsBilling ? shippingAddress : billingAddress,
+      paymentMethod: paymentMethod === "card" ? "card" : paymentMethod,
+    };
+
+    if (isAuthenticated) {
+      try {
+        const created = await createOrder(payload).unwrap();
+        dispatch(clearCart());
+        toast.success("Order placed!", `Order ${created.number} confirmed.`);
+        router.push(`/order-success?number=${created.number}`);
+      } catch (err) {
+        toast.error("Order failed", getErrorMessage(err));
+        setProcessing(false);
+      }
+      return;
+    }
+
     const orderNumber = generateOrderNumber();
     const now = new Date();
     const eta = new Date(now);
@@ -143,7 +183,7 @@ export default function CheckoutPage() {
       items: items.map((i) => ({
         productId: i.product.id,
         name: i.product.name,
-        image: i.product.images[0],
+        image: i.product.images?.[0] ?? "",
         price: i.product.price,
         quantity: i.quantity,
       })),
@@ -178,13 +218,11 @@ export default function CheckoutPage() {
       },
     };
 
-    setTimeout(() => {
-      saveOrder(order);
-      clearCart();
-      setProcessing(false);
-      success("Order placed!", `Order ${orderNumber} confirmed.`);
-      router.push(`/order-success?number=${orderNumber}`);
-    }, 1400);
+    saveOrder(order);
+    dispatch(clearCart());
+    setProcessing(false);
+    toast.success("Order placed!", `Order ${orderNumber} confirmed.`);
+    router.push(`/order-success?number=${orderNumber}`);
   };
 
   const updateAddress = (
@@ -377,7 +415,7 @@ export default function CheckoutPage() {
                   <ul className="mt-4 space-y-3">
                     {items.map((item) => (
                       <li key={item.product.id} className="flex items-center gap-3">
-                        <ProductImage src={item.product.images[0]} alt={item.product.name} className="h-12 w-12 rounded-lg" imgClassName="rounded-lg" />
+                         <ProductImage src={item.product.images?.[0] ?? ""} alt={item.product.name} className="h-12 w-12 rounded-lg" imgClassName="rounded-lg" />
                         <div className="min-w-0 flex-1">
                           <p className="clamp-1 text-sm font-medium text-foreground">{item.product.name}</p>
                           <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
@@ -419,7 +457,7 @@ export default function CheckoutPage() {
                 {items.slice(0, 4).map((item) => (
                   <li key={item.product.id} className="flex items-center gap-3">
                     <div className="relative shrink-0">
-                      <ProductImage src={item.product.images[0]} alt={item.product.name} className="h-14 w-14 rounded-lg" imgClassName="rounded-lg" />
+                       <ProductImage src={item.product.images?.[0] ?? ""} alt={item.product.name} className="h-14 w-14 rounded-lg" imgClassName="rounded-lg" />
                       <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background">
                         {item.quantity}
                       </span>

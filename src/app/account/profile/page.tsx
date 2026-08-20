@@ -13,13 +13,13 @@ import {
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { useAuth } from "@/context/AuthProvider";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { readOrders } from "@/lib/orders-store";
 import { sampleOrders } from "@/lib/data/content";
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { data: user } = useGetMeQuery();
 
   const recentOrders = [...readOrders(), ...sampleOrders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

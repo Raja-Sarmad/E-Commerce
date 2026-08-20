@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FiCreditCard,
   FiGlobe,
@@ -14,8 +14,12 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  useGetSettingsQuery,
+  useUpdateSettingsMutation,
+} from "@/lib/rtk/adminApi";
 
 const tabs = [
   { key: "general", label: "General", icon: FiGlobe },
@@ -27,29 +31,53 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number]["key"];
 
+type SettingsForm = {
+  storeName: string;
+  storeEmail: string;
+  storePhone: string;
+  supportEmail: string;
+  currency: string;
+  taxRate: string;
+  freeShippingThreshold: string;
+  shippingRate: string;
+  orderPrefix: string;
+  defaultOrderStatus: string;
+  paymentGateway: string;
+  testMode: boolean;
+  emailFromName: string;
+  emailFromAddress: string;
+  dailySummary: boolean;
+  twoFactor: boolean;
+  passwordMinLength: string;
+  sessionTimeout: string;
+};
+
+const defaults: SettingsForm = {
+  storeName: "",
+  storeEmail: "",
+  storePhone: "",
+  supportEmail: "",
+  currency: "USD",
+  taxRate: "0",
+  freeShippingThreshold: "0",
+  shippingRate: "0",
+  orderPrefix: "",
+  defaultOrderStatus: "pending",
+  paymentGateway: "stripe",
+  testMode: false,
+  emailFromName: "",
+  emailFromAddress: "",
+  dailySummary: false,
+  twoFactor: false,
+  passwordMinLength: "8",
+  sessionTimeout: "30",
+};
+
 export default function AdminSettingsPage() {
-  const { success } = useToast();
   const [active, setActive] = useState<TabKey>("general");
-  const [form, setForm] = useState({
-    storeName: "NovaMart",
-    storeEmail: "support@novamart.com",
-    storePhone: "+1 (555) 018-2234",
-    supportEmail: "help@novamart.com",
-    currency: "USD",
-    taxRate: "8",
-    freeShippingThreshold: "100",
-    shippingRate: "12",
-    orderPrefix: "NM",
-    defaultOrderStatus: "confirmed",
-    paymentGateway: "stripe",
-    testMode: true,
-    emailFromName: "NovaMart",
-    emailFromAddress: "no-reply@novamart.com",
-    dailySummary: true,
-    twoFactor: false,
-    passwordMinLength: "8",
-    sessionTimeout: "30",
-  });
+  const { data: apiSettings, isLoading } = useGetSettingsQuery();
+  const [updateSettings, { isLoading: isSaving }] = useUpdateSettingsMutation();
+  const [form, setForm] = useState<SettingsForm>(defaults);
   const [toggles, setToggles] = useState({
     maintenanceMode: false,
     newCustomerDiscount: true,
@@ -61,11 +89,52 @@ export default function AdminSettingsPage() {
     twoFactor: false,
   });
 
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+  useEffect(() => {
+    if (!apiSettings) return;
+    const s = apiSettings as Record<string, unknown>;
+    setForm({
+      storeName: String(s.storeName ?? defaults.storeName),
+      storeEmail: String(s.storeEmail ?? defaults.storeEmail),
+      storePhone: String(s.storePhone ?? defaults.storePhone),
+      supportEmail: String(s.supportEmail ?? defaults.supportEmail),
+      currency: String(s.currency ?? defaults.currency),
+      taxRate: String(s.taxRate ?? defaults.taxRate),
+      freeShippingThreshold: String(s.freeShippingThreshold ?? defaults.freeShippingThreshold),
+      shippingRate: String(s.shippingRate ?? defaults.shippingRate),
+      orderPrefix: String(s.orderPrefix ?? defaults.orderPrefix),
+      defaultOrderStatus: String(s.defaultOrderStatus ?? defaults.defaultOrderStatus),
+      paymentGateway: String(s.paymentGateway ?? defaults.paymentGateway),
+      testMode: Boolean(s.testMode ?? defaults.testMode),
+      emailFromName: String(s.emailFromName ?? defaults.emailFromName),
+      emailFromAddress: String(s.emailFromAddress ?? defaults.emailFromAddress),
+      dailySummary: Boolean(s.dailySummary ?? defaults.dailySummary),
+      twoFactor: Boolean(s.twoFactor ?? defaults.twoFactor),
+      passwordMinLength: String(s.passwordMinLength ?? defaults.passwordMinLength),
+      sessionTimeout: String(s.sessionTimeout ?? defaults.sessionTimeout),
+    });
+    setToggles({
+      maintenanceMode: Boolean(s.maintenanceMode ?? false),
+      newCustomerDiscount: Boolean(s.newCustomerDiscount ?? true),
+      autoApplyCoupons: Boolean(s.autoApplyCoupons ?? true),
+      lowStockAlerts: Boolean(s.lowStockAlerts ?? true),
+      emailNotifications: Boolean(s.emailNotifications ?? true),
+      testMode: Boolean(s.testMode ?? true),
+      dailySummary: Boolean(s.dailySummary ?? true),
+      twoFactor: Boolean(s.twoFactor ?? false),
+    });
+  }, [apiSettings]);
+
+  const set = <K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const handleSave = () => {
-    success("Settings saved", "Your changes have been applied.");
+  const handleSave = async () => {
+    const payload = { ...form, ...toggles };
+    try {
+      await updateSettings(payload).unwrap();
+      toast.success("Settings saved", "Your changes have been applied.");
+    } catch {
+      toast.error("Save failed", "Something went wrong. Please try again.");
+    }
   };
 
   const toggle = (key: keyof typeof toggles) => {
@@ -96,6 +165,14 @@ export default function AdminSettingsPage() {
     </div>
   );
 
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading settings…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -103,8 +180,8 @@ export default function AdminSettingsPage() {
         subtitle="Configure your store, payments, email and security."
         breadcrumb={[{ label: "Settings" }]}
         actions={
-          <Button onClick={handleSave} leftIcon={<FiSave className="h-4 w-4" aria-hidden />}>
-            Save changes
+          <Button onClick={handleSave} leftIcon={<FiSave className="h-4 w-4" aria-hidden />} disabled={isSaving}>
+            {isSaving ? "Saving…" : "Save changes"}
           </Button>
         }
       />
@@ -254,8 +331,8 @@ export default function AdminSettingsPage() {
       )}
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} leftIcon={<FiSave className="h-4 w-4" aria-hidden />}>
-          Save settings
+        <Button onClick={handleSave} leftIcon={<FiSave className="h-4 w-4" aria-hidden />} disabled={isSaving}>
+          {isSaving ? "Saving…" : "Save settings"}
         </Button>
       </div>
     </div>

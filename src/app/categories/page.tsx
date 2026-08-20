@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { ProductImage } from "@/components/ui/ProductImage";
-import { categories } from "@/lib/data/categories";
-import { getProductsByCategory } from "@/lib/data/products";
+import { getCategories, getProducts } from "@/lib/api/server";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Categories",
@@ -11,7 +12,27 @@ export const metadata: Metadata = {
     "Shop NovaMart by category — electronics, fashion, home & living, beauty, sports and toys.",
 };
 
-export default function CategoriesPage() {
+export default async function CategoriesPage() {
+  let categories: Awaited<ReturnType<typeof getCategories>> = [];
+  try {
+    categories = await getCategories();
+  } catch {
+    // backend unavailable — render empty state
+  }
+
+  const counts = new Map<string, number>();
+  if (categories.length > 0) {
+    const batches = await Promise.allSettled(
+      categories.map(async (c) => {
+        const res = await getProducts({ categorySlug: c.slug, limit: 1 });
+        return [c.slug, res.meta.total] as const;
+      })
+    );
+    batches.forEach((b) => {
+      if (b.status === "fulfilled") counts.set(b.value[0], b.value[1]);
+    });
+  }
+
   return (
     <Container className="py-6">
       <Breadcrumb items={[{ label: "Categories" }]} />
@@ -27,7 +48,7 @@ export default function CategoriesPage() {
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {categories.map((category) => {
-          const items = getProductsByCategory(category.slug);
+          const count = counts.get(category.slug) ?? category.count ?? 0;
           return (
             <a
               key={category.id}
@@ -46,7 +67,7 @@ export default function CategoriesPage() {
                     {category.name}
                   </h2>
                   <p className="text-sm text-white/80">
-                    {items.length} products
+                    {count} {count === 1 ? "product" : "products"}
                   </p>
                 </div>
               </div>

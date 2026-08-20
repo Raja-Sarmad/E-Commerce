@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSelector, useDispatch } from "react-redux";
 import {
   FiBarChart2,
   FiCheck,
@@ -17,10 +18,17 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Rating } from "@/components/ui/Rating";
 import { Badge } from "@/components/ui/Badge";
-import { useCart } from "@/context/CartProvider";
-import { useWishlist } from "@/context/WishlistProvider";
-import { useCompare } from "@/context/CompareProvider";
-import { useToast } from "@/context/ToastProvider";
+import { AuthRequiredModal } from "@/components/ui/AuthRequiredModal";
+import {
+  addItem,
+  updateQuantity,
+  selectIsInCart,
+} from "@/lib/rtk/cartSlice";
+import { toggleWishlist, selectIsInWishlist } from "@/lib/rtk/wishlistSlice";
+import { toggleCompare, selectIsInCompare } from "@/lib/rtk/compareSlice";
+import { toast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { formatPrice, getStockLabel } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -30,19 +38,20 @@ type ProductDetailsProps = {
 };
 
 export function ProductDetails({ product }: ProductDetailsProps) {
-  const { addItem } = useCart();
-  const { isInWishlist, toggleWishlist } = useWishlist();
-  const { isInCompare, toggleCompare } = useCompare();
-  const { success, info } = useToast();
+  const dispatch = useDispatch();
+  const { isAdmin } = useIsAdmin();
+  const { data: user } = useGetMeQuery();
+  const inCart = useSelector(selectIsInCart(product.id));
+  const wishlisted = useSelector(selectIsInWishlist(product.id));
+  const compared = useSelector(selectIsInCompare(product.id));
   const router = useRouter();
 
   const [qty, setQty] = useState(1);
   const [color, setColor] = useState(product.colors[0]);
   const [size, setSize] = useState(product.sizes?.[0]);
   const [added, setAdded] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const wishlisted = isInWishlist(product.id);
-  const compared = isInCompare(product.id);
   const outOfStock = product.stock === 0;
   const discount = product.compareAtPrice
     ? Math.round(
@@ -51,28 +60,37 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     : 0;
 
   const handleAddToCart = (buyNow = false) => {
-    if (outOfStock) {
-      info("Out of stock", "This product is currently unavailable.");
+    if (!user) {
+      setShowAuthModal(true);
       return;
     }
-    addItem(product, qty, color, size);
-    setAdded(true);
-    success("Added to cart", `${qty} × ${product.name}`);
-    setTimeout(() => setAdded(false), 1500);
+    if (outOfStock) {
+      toast.info("Out of stock", "This product is currently unavailable.");
+      return;
+    }
+    if (inCart) {
+      dispatch(updateQuantity({ productId: product.id, quantity: qty }));
+      toast.success("Cart updated", `${qty} × ${product.name}`);
+    } else {
+      dispatch(addItem({ product, quantity: qty, color, size }));
+      setAdded(true);
+      toast.success("Added to cart", `${qty} × ${product.name}`);
+      setTimeout(() => setAdded(false), 1500);
+    }
     if (buyNow) router.push("/checkout");
   };
 
   const handleWishlist = () => {
-    toggleWishlist(product);
-    success(
+    dispatch(toggleWishlist(product));
+    toast.success(
       wishlisted ? "Removed from wishlist" : "Added to wishlist",
       product.name
     );
   };
 
   const handleCompare = () => {
-    toggleCompare(product);
-    success(compared ? "Removed from compare" : "Added to compare", product.name);
+    dispatch(toggleCompare(product));
+    toast.success(compared ? "Removed from compare" : "Added to compare", product.name);
   };
 
   const handleShare = async () => {
@@ -82,10 +100,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         await navigator.share({ title: product.name, url });
       } else {
         await navigator.clipboard.writeText(url);
-        success("Link copied", "Product link copied to clipboard.");
+        toast.success("Link copied", "Product link copied to clipboard.");
       }
     } catch {
-      success("Link copied", "Product link copied to clipboard.");
+      toast.success("Link copied", "Product link copied to clipboard.");
     }
   };
 
@@ -212,54 +230,62 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <div className="flex items-center rounded-xl border border-border">
-          <button
-            type="button"
-            onClick={() => setQty((q) => Math.max(1, q - 1))}
-            aria-label="Decrease quantity"
-            className="px-3.5 py-3 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <FiMinus className="h-4 w-4" aria-hidden />
-          </button>
-          <span className="w-10 text-center text-sm font-bold text-foreground">
-            {qty}
-          </span>
-          <button
-            type="button"
-            onClick={() => setQty((q) => Math.min(99, q + 1))}
-            aria-label="Increase quantity"
-            className="px-3.5 py-3 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <FiPlus className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
+        {!isAdmin && (
+          <>
+            <div className="flex items-center rounded-xl border border-border">
+              <button
+                type="button"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                aria-label="Decrease quantity"
+                className="px-3.5 py-3 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <FiMinus className="h-4 w-4" aria-hidden />
+              </button>
+              <span className="w-10 text-center text-sm font-bold text-foreground">
+                {qty}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQty((q) => Math.min(99, q + 1))}
+                aria-label="Increase quantity"
+                className="px-3.5 py-3 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <FiPlus className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
 
-        <Button
-          onClick={() => handleAddToCart()}
-          size="lg"
-          disabled={outOfStock}
-          className="flex-1 sm:flex-none sm:min-w-44"
-        >
-          {added ? (
-            <>
-              <FiCheck className="h-5 w-5" aria-hidden /> Added to cart
-            </>
-          ) : (
-            <>
-              <FiShoppingBag className="h-5 w-5" aria-hidden />
-              {outOfStock ? "Out of stock" : "Add to cart"}
-            </>
-          )}
-        </Button>
+            <Button
+              onClick={() => handleAddToCart()}
+              size="lg"
+              disabled={outOfStock}
+              className="flex-1 sm:flex-none sm:min-w-44"
+            >
+              {added ? (
+                <>
+                  <FiCheck className="h-5 w-5" aria-hidden /> Added to cart
+                </>
+              ) : inCart ? (
+                <>
+                  <FiShoppingBag className="h-5 w-5" aria-hidden /> Update cart
+                </>
+              ) : (
+                <>
+                  <FiShoppingBag className="h-5 w-5" aria-hidden />
+                  {outOfStock ? "Out of stock" : "Add to cart"}
+                </>
+              )}
+            </Button>
 
-        <Button
-          variant="accent"
-          size="lg"
-          disabled={outOfStock}
-          onClick={() => handleAddToCart(true)}
-        >
-          Buy now
-        </Button>
+            <Button
+              variant="accent"
+              size="lg"
+              disabled={outOfStock}
+              onClick={() => handleAddToCart(true)}
+            >
+              Buy now
+            </Button>
+          </>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -317,6 +343,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           </div>
         ))}
       </div>
+
+      <AuthRequiredModal open={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 }

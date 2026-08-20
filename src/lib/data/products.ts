@@ -1219,6 +1219,7 @@ export const products: Product[] = spec.map((p, i) => {
     discountPercent: discount,
     colors: p.colors,
     sizes: p.sizes,
+    position: i + 1,
     createdAt: p.createdAt,
     reviews: buildReviews(seed, i + 1),
   };
@@ -1287,5 +1288,5 @@ export function searchProducts(query: string) {
 }
 
 export function getProductImage(product: Product) {
-  return product.images[0];
+  return product.images?.[0] ?? "";
 }

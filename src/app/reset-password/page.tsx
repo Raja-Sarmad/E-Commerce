@@ -7,10 +7,9 @@ import { FiCheckCircle, FiLock } from "react-icons/fi";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 
 export default function ResetPasswordPage() {
-  const { success } = useToast();
   const router = useRouter();
   const [form, setForm] = useState({ password: "", confirm: "" });
   const [done, setDone] = useState(false);
@@ -32,7 +31,7 @@ export default function ResetPasswordPage() {
     await new Promise((resolve) => setTimeout(resolve, 900));
     setLoading(false);
     setDone(true);
-    success("Password updated", "You can now sign in with your new password.");
+    toast.success("Password updated", "You can now sign in with your new password.");
   };
 
   return (

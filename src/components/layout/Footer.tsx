@@ -20,7 +20,7 @@ import {
 import { Container } from "@/components/ui/Container";
 import { Logo } from "./Logo";
 import { Input } from "@/components/ui/Input";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import { footerLinks, siteConfig } from "@/lib/site";
 
 const benefits = [
@@ -150,13 +150,12 @@ export function Footer() {
 }
 
 function NewsletterBar() {
-  const { success } = useToast();
   const [email, setEmail] = useState("");
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) return;
-    success("Subscribed!", "You'll receive our best deals and new arrivals.");
+    toast.success("Subscribed!", "You'll receive our best deals and new arrivals.");
     setEmail("");
   };
 

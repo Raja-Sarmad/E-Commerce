@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   FiArrowRight,
   FiMinus,
@@ -10,54 +11,65 @@ import {
   FiShoppingBag,
   FiX,
 } from "react-icons/fi";
+import { useSelector, useDispatch } from "react-redux";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductImage } from "@/components/ui/ProductImage";
-import { useCart } from "@/context/CartProvider";
-import { useToast } from "@/context/ToastProvider";
+import {
+  selectCartItems,
+  selectCartTotals,
+  selectCartCoupon,
+  updateQuantity,
+  removeItem,
+  clearCart,
+  applyCoupon,
+  removeCoupon,
+} from "@/lib/rtk/cartSlice";
+import { useValidateCouponMutation } from "@/lib/rtk/storefrontApi";
+import { toast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import { siteConfig } from "@/lib/site";
 import { formatPrice, cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function CartPage() {
-  const {
-    items,
-    subtotal,
-    discount,
-    shipping,
-    tax,
-    total,
-    coupon,
-    updateQuantity,
-    removeItem,
-    applyCoupon,
-    removeCoupon,
-    clearCart,
-  } = useCart();
-  const { success, error } = useToast();
+  const dispatch = useDispatch();
+  const router = useRouter();
+  const { isAdmin } = useIsAdmin();
+  const items = useSelector(selectCartItems);
+  const { subtotal, discount, shipping, tax, total } = useSelector(selectCartTotals);
+  const coupon = useSelector(selectCartCoupon);
+  const [validateCoupon] = useValidateCouponMutation();
   const [code, setCode] = useState("");
 
   const freeShippingLeft = Math.max(0, siteConfig.freeShippingThreshold - (subtotal - discount));
   const progress = Math.min(100, ((subtotal - discount) / siteConfig.freeShippingThreshold) * 100);
 
-  const handleApplyCoupon = () => {
-    if (!code.trim()) return;
-    const ok = applyCoupon(code.trim());
-    if (ok) {
-      success("Coupon applied", `Code ${code.trim().toUpperCase()} applied successfully.`);
-      setCode("");
-    } else {
-      error("Invalid coupon", "This code is invalid, expired, or doesn't meet the minimum spend.");
-    }
-  };
+  useEffect(() => {
+    if (isAdmin) router.replace("/admin");
+  }, [isAdmin, router]);
 
-  const handleCheckout = () => {
-    if (items.length === 0) return;
-    if (typeof window !== "undefined") {
-      window.location.href = "/checkout";
+  const handleApplyCoupon = async () => {
+    if (!code.trim()) return;
+    try {
+      const result = await validateCoupon({ code: code.trim() }).unwrap();
+      const couponData = result as unknown as { code: string; type: string; value: number; minSpend: number; maxDiscount?: number };
+      dispatch(applyCoupon({
+        code: couponData.code,
+        type: couponData.type as "percentage" | "fixed",
+        value: couponData.value,
+        minSpend: couponData.minSpend,
+        maxDiscount: couponData.maxDiscount,
+        expiresAt: "",
+        active: true,
+      }));
+      toast.success("Coupon applied", `Code ${code.trim().toUpperCase()} applied successfully.`);
+      setCode("");
+    } catch {
+      toast.error("Invalid coupon", "This code is invalid, expired, or doesn't meet the minimum spend.");
     }
   };
 
@@ -98,7 +110,7 @@ export default function CartPage() {
               </p>
               <button
                 type="button"
-                onClick={clearCart}
+                onClick={() => dispatch(clearCart())}
                 className="text-sm font-medium text-muted-foreground transition-colors hover:text-destructive"
               >
                 Clear cart
@@ -122,7 +134,7 @@ export default function CartPage() {
                     className="shrink-0"
                   >
                     <ProductImage
-                      src={item.product.images[0]}
+                      src={item.product.images?.[0] ?? ""}
                       alt={item.product.name}
                       className="h-24 w-24 rounded-xl"
                       imgClassName="rounded-xl"
@@ -158,7 +170,7 @@ export default function CartPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeItem(item.product.id)}
+                        onClick={() => dispatch(removeItem(item.product.id))}
                         aria-label={`Remove ${item.product.name}`}
                         className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       >
@@ -169,7 +181,7 @@ export default function CartPage() {
                       <div className="flex items-center rounded-lg border border-border">
                         <button
                           type="button"
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                          onClick={() => dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity - 1 }))}
                           aria-label="Decrease quantity"
                           className="p-2 text-muted-foreground transition-colors hover:text-foreground"
                         >
@@ -180,7 +192,7 @@ export default function CartPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                          onClick={() => dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity + 1 }))}
                           aria-label="Increase quantity"
                           className="p-2 text-muted-foreground transition-colors hover:text-foreground"
                         >
@@ -258,7 +270,7 @@ export default function CartPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={removeCoupon}
+                      onClick={() => dispatch(removeCoupon())}
                       aria-label="Remove coupon"
                       className="rounded-md p-1 text-success transition-colors hover:bg-success/20"
                     >
@@ -285,7 +297,7 @@ export default function CartPage() {
                 size="lg"
                 fullWidth
                 className="mt-5"
-                onClick={handleCheckout}
+                href="/checkout"
               >
                 Proceed to checkout
                 <FiArrowRight className="h-4 w-4" aria-hidden />

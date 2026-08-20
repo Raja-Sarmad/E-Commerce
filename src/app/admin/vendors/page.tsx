@@ -15,16 +15,50 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import {
-  getVendorProducts,
-  generateId,
-  vendors as seedVendors,
-  type Vendor,
-} from "@/lib/data/admin";
+  useGetAdminVendorsQuery,
+  useUpdateVendorStatusMutation,
+  useDeleteVendorMutation,
+} from "@/lib/rtk/adminApi";
+import type { AdminVendor } from "@/lib/rtk/adminApi";
 import { formatDate, formatPrice } from "@/lib/utils";
 
 const PER_PAGE = 8;
+
+type Vendor = {
+  id: string;
+  name: string;
+  logo: string;
+  email: string;
+  phone: string;
+  productsCount: number;
+  totalEarnings: number;
+  pendingPayout: number;
+  rating: number;
+  verified: boolean;
+  joinedAt: string;
+  status: "active" | "pending" | "suspended";
+  description: string;
+};
+
+function toVendor(v: AdminVendor): Vendor {
+  return {
+    id: v._id,
+    name: v.name,
+    logo: v.logo,
+    email: v.email,
+    phone: v.phone,
+    productsCount: v.productsCount,
+    totalEarnings: v.totalEarnings,
+    pendingPayout: v.pendingPayout,
+    rating: v.rating,
+    verified: v.verified,
+    joinedAt: v.createdAt,
+    status: v.status as Vendor["status"],
+    description: v.description,
+  };
+}
 
 function StatCard({
   icon,
@@ -54,50 +88,35 @@ function StatCard({
   );
 }
 
-type AddVendorForm = {
-  name: string;
-  email: string;
-  phone: string;
-  description: string;
-};
-
 export default function AdminVendorsPage() {
-  const { success, info } = useToast();
-  const [vendors, setVendors] = useState<Vendor[]>(seedVendors);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [viewVendor, setViewVendor] = useState<Vendor | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState<AddVendorForm>({
-    name: "",
-    email: "",
-    phone: "",
-    description: "",
+
+  const { data, isLoading } = useGetAdminVendorsQuery({
+    page,
+    limit: pageSize,
+    search: query || undefined,
+    status: status !== "all" ? status : undefined,
   });
-  const [formError, setFormError] = useState("");
+  const [updateVendorStatus] = useUpdateVendorStatusMutation();
+  const [deleteVendor] = useDeleteVendorMutation();
+
+  const vendors = useMemo(() => {
+    return (data?.items ?? []).map(toVendor);
+  }, [data]);
 
   const activeCount = vendors.filter((v) => v.status === "active").length;
   const pendingCount = vendors.filter((v) => v.status === "pending").length;
   const totalEarnings = vendors.reduce((sum, v) => sum + v.totalEarnings, 0);
   const totalPayout = vendors.reduce((sum, v) => sum + v.pendingPayout, 0);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return vendors.filter((v) => {
-      const matchesQuery =
-        !q ||
-        v.name.toLowerCase().includes(q) ||
-        v.email.toLowerCase().includes(q) ||
-        v.description.toLowerCase().includes(q);
-      const matchesStatus = status === "all" || v.status === status;
-      return matchesQuery && matchesStatus;
-    });
-  }, [vendors, query, status]);
+  const filtered = vendors;
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
+  const totalItems = data?.total ?? filtered.length;
 
   const handlePageSize = (size: number) => {
     setPageSize(size);
@@ -105,38 +124,15 @@ export default function AdminVendorsPage() {
   };
 
   const changeStatus = (id: string, next: Vendor["status"]) => {
-    setVendors((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, status: next } : v))
-    );
-    const vendor = vendors.find((v) => v.id === id);
-    info("Status updated", `“${vendor?.name}” is now ${next}.`);
-  };
-
-  const submitVendor = () => {
-    if (!form.name.trim() || !form.email.trim()) {
-      setFormError("Name and email are required.");
-      return;
-    }
-    const vendor: Vendor = {
-      id: generateId("vd"),
-      name: form.name.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-      logo: `https://picsum.photos/seed/vd-${generateId("x")}/80/80`,
-      productsCount: 0,
-      totalEarnings: 0,
-      pendingPayout: 0,
-      rating: 0,
-      verified: false,
-      joinedAt: new Date().toISOString(),
-      status: "pending",
-      description: form.description.trim(),
-    };
-    setVendors((prev) => [vendor, ...prev]);
-    setAddOpen(false);
-    setForm({ name: "", email: "", phone: "", description: "" });
-    setFormError("");
-    success("Vendor added", `“${vendor.name}” is awaiting approval.`);
+    updateVendorStatus({ id, status: next })
+      .unwrap()
+      .then(() => {
+        const vendor = vendors.find((v) => v.id === id);
+        toast.info("Status updated", `"${vendor?.name}" is now ${next}.`);
+      })
+      .catch(() => {
+        toast.warning("Error", "Failed to update vendor status.");
+      });
   };
 
   const columns: Column<Vendor>[] = [
@@ -252,13 +248,11 @@ export default function AdminVendorsPage() {
     },
   ];
 
-  const viewProducts = viewVendor ? getVendorProducts(viewVendor.id) : [];
-
   return (
     <div className="space-y-6">
       <AdminPageHeader
         title="Vendors"
-        subtitle={`Manage marketplace vendors — ${vendors.length} total, ${pendingCount} awaiting approval.`}
+        subtitle={`Manage marketplace vendors — ${totalItems} total, ${pendingCount} awaiting approval.`}
         breadcrumb={[{ label: "Vendors" }]}
         actions={
           <>
@@ -277,10 +271,6 @@ export default function AdminVendorsPage() {
               }))}
               disabled={filtered.length === 0}
             />
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <FiPlus className="h-4 w-4" aria-hidden />
-              Add vendor
-            </Button>
           </>
         }
       />
@@ -339,12 +329,13 @@ export default function AdminVendorsPage() {
 
       <DataTable<Vendor>
         columns={columns}
-        rows={pageItems}
+        rows={filtered}
         rowKey={(v) => v.id}
+        loading={isLoading}
         pagination={{
           page,
           totalPages,
-          totalItems: filtered.length,
+          totalItems,
           pageSize,
           onPageChange: setPage,
           onPageSizeChange: handlePageSize,
@@ -353,9 +344,7 @@ export default function AdminVendorsPage() {
         empty={{
           icon: <FiUsers className="h-7 w-7" aria-hidden />,
           title: "No vendors found",
-          description: "Try adjusting your search or filters, or add a new vendor.",
-          actionLabel: "Add vendor",
-          onAction: () => setAddOpen(true),
+          description: "Try adjusting your search or filters.",
         }}
       />
 
@@ -451,111 +440,8 @@ export default function AdminVendorsPage() {
                 </p>
               </Card>
             </div>
-
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-foreground">
-                Products ({viewProducts.length})
-              </h3>
-              {viewProducts.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                  No products listed yet for this vendor.
-                </p>
-              ) : (
-                <div className="overflow-hidden rounded-xl border border-border">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
-                        <tr className="border-b border-border">
-                          <th className="px-4 py-2.5 font-semibold">Product</th>
-                          <th className="px-4 py-2.5 text-right font-semibold">Price</th>
-                          <th className="px-4 py-2.5 text-right font-semibold">Commission</th>
-                          <th className="px-4 py-2.5 text-center font-semibold">Sold</th>
-                          <th className="px-4 py-2.5 text-center font-semibold">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {viewProducts.map((vp) => (
-                          <tr key={vp.id}>
-                            <td className="px-4 py-2.5 font-semibold text-foreground">
-                              {vp.name}
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-bold text-foreground">
-                              {formatPrice(vp.price)}
-                            </td>
-                            <td className="px-4 py-2.5 text-right text-muted-foreground">
-                              {vp.commissionRate}%
-                            </td>
-                            <td className="px-4 py-2.5 text-center text-muted-foreground">
-                              {vp.sold}
-                            </td>
-                            <td className="px-4 py-2.5 text-center">
-                              <StatusBadge status={vp.status} />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         )}
-      </Modal>
-
-      <Modal
-        open={addOpen}
-        onClose={() => {
-          setAddOpen(false);
-          setFormError("");
-        }}
-        title="Add vendor"
-        subtitle="Invite a new vendor to the marketplace."
-        size="md"
-      >
-        <div className="space-y-4">
-          <Input
-            label="Name"
-            placeholder="Acme Audio"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <Input
-            label="Email"
-            type="email"
-            placeholder="hello@acmeaudio.com"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <Input
-            label="Phone"
-            placeholder="+1 555 010 2001"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-          <Textarea
-            label="Description"
-            placeholder="Brief description of the vendor's catalog..."
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-          {formError && <p className="text-xs font-medium text-destructive">{formError}</p>}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setAddOpen(false);
-                setFormError("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitVendor}>
-              <FiPlus className="h-4 w-4" aria-hidden />
-              Add vendor
-            </Button>
-          </div>
-        </div>
       </Modal>
     </div>
   );

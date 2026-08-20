@@ -12,25 +12,22 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import {
-  generateId,
-  shippingZones as seedZones,
-  shippingMethods as seedMethods,
-  type ShippingZone,
-} from "@/lib/data/admin";
+  useGetAdminShippingZonesQuery,
+  useCreateShippingZoneMutation,
+  useUpdateShippingZoneMutation,
+  useDeleteShippingZoneMutation,
+  useGetAdminShippingMethodsQuery,
+  useCreateShippingMethodMutation,
+  useUpdateShippingMethodMutation,
+  useDeleteShippingMethodMutation,
+  type AdminShippingZone,
+  type AdminShippingMethod,
+} from "@/lib/rtk/adminApi";
 import { formatPrice } from "@/lib/utils";
 
 const PER_PAGE = 8;
-
-type ShippingMethod = {
-  id: string;
-  name: string;
-  zone: string;
-  price: number;
-  eta: string;
-  active: boolean;
-};
 
 type ZoneForm = {
   name: string;
@@ -92,28 +89,35 @@ function Toggle({
 }
 
 export default function AdminShippingPage() {
-  const { success, info } = useToast();
+  const { data: zonesData } = useGetAdminShippingZonesQuery({});
+  const { data: methodsData } = useGetAdminShippingMethodsQuery({});
+  const [createShippingZone] = useCreateShippingZoneMutation();
+  const [updateShippingZone] = useUpdateShippingZoneMutation();
+  const [deleteShippingZone] = useDeleteShippingZoneMutation();
+  const [createShippingMethod] = useCreateShippingMethodMutation();
+  const [updateShippingMethod] = useUpdateShippingMethodMutation();
+  const [deleteShippingMethod] = useDeleteShippingMethodMutation();
 
-  const [zones, setZones] = useState<ShippingZone[]>(seedZones);
-  const [methods, setMethods] = useState<ShippingMethod[]>(seedMethods);
+  const zones = zonesData?.items ?? [];
+  const methods = methodsData?.items ?? [];
 
   const [zoneQuery, setZoneQuery] = useState("");
   const [zonePage, setZonePage] = useState(1);
   const [zonePageSize, setZonePageSize] = useState(PER_PAGE);
   const [zoneFormOpen, setZoneFormOpen] = useState(false);
-  const [zoneEditing, setZoneEditing] = useState<ShippingZone | null>(null);
+  const [zoneEditing, setZoneEditing] = useState<AdminShippingZone | null>(null);
   const [zoneForm, setZoneForm] = useState<ZoneForm>(emptyZoneForm);
   const [zoneFormError, setZoneFormError] = useState("");
-  const [deleteZone, setDeleteZone] = useState<ShippingZone | null>(null);
+  const [deleteZone, setDeleteZone] = useState<AdminShippingZone | null>(null);
 
   const [methodQuery, setMethodQuery] = useState("");
   const [methodPage, setMethodPage] = useState(1);
   const [methodPageSize, setMethodPageSize] = useState(PER_PAGE);
   const [methodFormOpen, setMethodFormOpen] = useState(false);
-  const [methodEditing, setMethodEditing] = useState<ShippingMethod | null>(null);
+  const [methodEditing, setMethodEditing] = useState<AdminShippingMethod | null>(null);
   const [methodForm, setMethodForm] = useState<MethodForm>(emptyMethodForm);
   const [methodFormError, setMethodFormError] = useState("");
-  const [deleteMethod, setDeleteMethod] = useState<ShippingMethod | null>(null);
+  const [deleteMethod, setDeleteMethod] = useState<AdminShippingMethod | null>(null);
 
   const filteredZones = useMemo(() => {
     const q = zoneQuery.trim().toLowerCase();
@@ -140,23 +144,25 @@ export default function AdminShippingPage() {
     methodPage * methodPageSize
   );
 
-  const toggleZone = (id: string, name: string) => {
-    setZones((prev) =>
-      prev.map((z) => (z.id === id ? { ...z, active: !z.active } : z))
-    );
-    const zone = zones.find((z) => z.id === id);
-    info("Zone updated", `“${zone?.name}” is now ${zone?.active ? "disabled" : "active"}.`);
+  const toggleZone = async (zone: AdminShippingZone) => {
+    try {
+      await updateShippingZone({ id: zone._id, body: { active: !zone.active } }).unwrap();
+      toast.info("Zone updated", `"${zone.name}" is now ${zone.active ? "disabled" : "active"}.`);
+    } catch {
+      toast.error("Error", "Failed to update zone status.");
+    }
   };
 
-  const toggleMethod = (id: string, name: string) => {
-    setMethods((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, active: !m.active } : m))
-    );
-    const method = methods.find((m) => m.id === id);
-    info("Method updated", `“${method?.name}” is now ${method?.active ? "disabled" : "active"}.`);
+  const toggleMethod = async (method: AdminShippingMethod) => {
+    try {
+      await updateShippingMethod({ id: method._id, body: { active: !method.active } }).unwrap();
+      toast.info("Method updated", `"${method.name}" is now ${method.active ? "disabled" : "active"}.`);
+    } catch {
+      toast.error("Error", "Failed to update method status.");
+    }
   };
 
-  const openZoneModal = (zone?: ShippingZone) => {
+  const openZoneModal = (zone?: AdminShippingZone) => {
     setZoneEditing(zone ?? null);
     setZoneForm(
       zone
@@ -173,7 +179,7 @@ export default function AdminShippingPage() {
     setZoneFormOpen(true);
   };
 
-  const saveZone = () => {
+  const saveZone = async () => {
     if (!zoneForm.name.trim()) {
       setZoneFormError("Zone name is required.");
       return;
@@ -188,39 +194,29 @@ export default function AdminShippingPage() {
       setZoneFormError("Enter a valid base rate.");
       return;
     }
-    if (zoneEditing) {
-      setZones((prev) =>
-        prev.map((z) =>
-          z.id === zoneEditing.id
-            ? {
-                ...z,
-                name: zoneForm.name.trim(),
-                regions: zoneForm.regions.trim(),
-                baseRate,
-                freeAbove: Number.isFinite(freeAbove) ? freeAbove : 0,
-                methods: methodsList,
-              }
-            : z
-        )
-      );
-      success("Zone updated", `“${zoneForm.name.trim()}” was saved.`);
-    } else {
-      const zone: ShippingZone = {
-        id: generateId("sz"),
-        name: zoneForm.name.trim(),
-        regions: zoneForm.regions.trim(),
-        baseRate,
-        freeAbove: Number.isFinite(freeAbove) ? freeAbove : 0,
-        methods: methodsList,
-        active: true,
-      };
-      setZones((prev) => [zone, ...prev]);
-      success("Zone added", `“${zone.name}” was created.`);
+    const payload = {
+      name: zoneForm.name.trim(),
+      regions: zoneForm.regions.trim(),
+      baseRate,
+      freeAbove: Number.isFinite(freeAbove) ? freeAbove : 0,
+      methods: methodsList,
+    };
+    try {
+      if (zoneEditing) {
+        await updateShippingZone({ id: zoneEditing._id, body: payload }).unwrap();
+        toast.success("Zone updated", `"${payload.name}" was saved.`);
+      } else {
+        await createShippingZone({ ...payload, active: true }).unwrap();
+        toast.success("Zone added", `"${payload.name}" was created.`);
+      }
+      setZoneFormOpen(false);
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "data" in err ? String((err as { data?: unknown }).data) : String(err);
+      setZoneFormError(msg || "Something went wrong.");
     }
-    setZoneFormOpen(false);
   };
 
-  const openMethodModal = (method?: ShippingMethod) => {
+  const openMethodModal = (method?: AdminShippingMethod) => {
     setMethodEditing(method ?? null);
     setMethodForm(
       method
@@ -231,7 +227,7 @@ export default function AdminShippingPage() {
     setMethodFormOpen(true);
   };
 
-  const saveMethod = () => {
+  const saveMethod = async () => {
     if (!methodForm.name.trim()) {
       setMethodFormError("Method name is required.");
       return;
@@ -241,37 +237,50 @@ export default function AdminShippingPage() {
       setMethodFormError("Enter a valid price.");
       return;
     }
-    if (methodEditing) {
-      setMethods((prev) =>
-        prev.map((m) =>
-          m.id === methodEditing.id
-            ? {
-                ...m,
-                name: methodForm.name.trim(),
-                zone: methodForm.zone.trim(),
-                price,
-                eta: methodForm.eta.trim(),
-              }
-            : m
-        )
-      );
-      success("Method updated", `“${methodForm.name.trim()}” was saved.`);
-    } else {
-      const method: ShippingMethod = {
-        id: generateId("sm"),
-        name: methodForm.name.trim(),
-        zone: methodForm.zone.trim(),
-        price,
-        eta: methodForm.eta.trim(),
-        active: true,
-      };
-      setMethods((prev) => [method, ...prev]);
-      success("Method added", `“${method.name}” was created.`);
+    const payload = {
+      name: methodForm.name.trim(),
+      zone: methodForm.zone.trim(),
+      price,
+      eta: methodForm.eta.trim(),
+    };
+    try {
+      if (methodEditing) {
+        await updateShippingMethod({ id: methodEditing._id, body: payload }).unwrap();
+        toast.success("Method updated", `"${payload.name}" was saved.`);
+      } else {
+        await createShippingMethod({ ...payload, active: true }).unwrap();
+        toast.success("Method added", `"${payload.name}" was created.`);
+      }
+      setMethodFormOpen(false);
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "data" in err ? String((err as { data?: unknown }).data) : String(err);
+      setMethodFormError(msg || "Something went wrong.");
     }
-    setMethodFormOpen(false);
   };
 
-  const zoneColumns: Column<ShippingZone>[] = [
+  const removeZone = async () => {
+    if (!deleteZone) return;
+    try {
+      await deleteShippingZone(deleteZone._id).unwrap();
+      toast.success("Zone removed", `"${deleteZone.name}" was deleted.`);
+      setDeleteZone(null);
+    } catch {
+      toast.error("Error", "Failed to delete zone.");
+    }
+  };
+
+  const removeMethod = async () => {
+    if (!deleteMethod) return;
+    try {
+      await deleteShippingMethod(deleteMethod._id).unwrap();
+      toast.success("Method removed", `"${deleteMethod.name}" was deleted.`);
+      setDeleteMethod(null);
+    } catch {
+      toast.error("Error", "Failed to delete method.");
+    }
+  };
+
+  const zoneColumns: Column<AdminShippingZone>[] = [
     {
       key: "name",
       header: "Name",
@@ -331,7 +340,7 @@ export default function AdminShippingPage() {
           <Toggle
             active={z.active}
             label={`Toggle ${z.name}`}
-            onToggle={() => toggleZone(z.id, z.name)}
+            onToggle={() => toggleZone(z)}
           />
         </div>
       ),
@@ -363,7 +372,7 @@ export default function AdminShippingPage() {
     },
   ];
 
-  const methodColumns: Column<ShippingMethod>[] = [
+  const methodColumns: Column<AdminShippingMethod>[] = [
     {
       key: "name",
       header: "Name",
@@ -407,7 +416,7 @@ export default function AdminShippingPage() {
           <Toggle
             active={m.active}
             label={`Toggle ${m.name}`}
-            onToggle={() => toggleMethod(m.id, m.name)}
+            onToggle={() => toggleMethod(m)}
           />
         </div>
       ),
@@ -484,10 +493,10 @@ export default function AdminShippingPage() {
                     </>
                   }
                 />
-                <DataTable<ShippingZone>
+                <DataTable<AdminShippingZone>
                   columns={zoneColumns}
                   rows={zonePageItems}
-                  rowKey={(z) => z.id}
+                  rowKey={(z) => z._id}
                   pagination={{
                     page: zonePage,
                     totalPages: zoneTotalPages,
@@ -544,10 +553,10 @@ export default function AdminShippingPage() {
                     </>
                   }
                 />
-                <DataTable<ShippingMethod>
+                <DataTable<AdminShippingMethod>
                   columns={methodColumns}
                   rows={methodPageItems}
-                  rowKey={(m) => m.id}
+                  rowKey={(m) => m._id}
                   pagination={{
                     page: methodPage,
                     totalPages: methodTotalPages,
@@ -685,28 +694,18 @@ export default function AdminShippingPage() {
       <ConfirmDialog
         open={deleteZone !== null}
         onClose={() => setDeleteZone(null)}
-        onConfirm={() => {
-          if (!deleteZone) return;
-          setZones((prev) => prev.filter((z) => z.id !== deleteZone.id));
-          success("Zone removed", `“${deleteZone.name}” was deleted.`);
-          setDeleteZone(null);
-        }}
+        onConfirm={removeZone}
         title="Delete zone?"
-        description={`This will permanently remove “${deleteZone?.name}”. This action cannot be undone.`}
+        description={`This will permanently remove "${deleteZone?.name}". This action cannot be undone.`}
         confirmLabel="Delete"
       />
 
       <ConfirmDialog
         open={deleteMethod !== null}
         onClose={() => setDeleteMethod(null)}
-        onConfirm={() => {
-          if (!deleteMethod) return;
-          setMethods((prev) => prev.filter((m) => m.id !== deleteMethod.id));
-          success("Method removed", `“${deleteMethod.name}” was deleted.`);
-          setDeleteMethod(null);
-        }}
+        onConfirm={removeMethod}
         title="Delete method?"
-        description={`This will permanently remove “${deleteMethod?.name}”. This action cannot be undone.`}
+        description={`This will permanently remove "${deleteMethod?.name}". This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>

@@ -4,11 +4,13 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductCard } from "@/components/product/ProductCard";
 import { LinkPagination as Pagination } from "@/components/ui/LinkPagination";
-import { searchProducts } from "@/lib/data/products";
+import { searchProducts } from "@/lib/api/server";
 import { filterAndSortProducts, paginate } from "@/lib/filter";
 import { FiSearch } from "react-icons/fi";
 
 const PER_PAGE = 12;
+
+export const dynamic = "force-dynamic";
 
 type SearchPageProps = PageProps<"/search">;
 
@@ -37,7 +39,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   };
   const page = Math.max(1, Number(params.page) || 1);
 
-  const filtered = filterAndSortProducts([], query, searchProducts);
+  const results = q.trim() ? await searchProducts(q) : [];
+  const filtered = filterAndSortProducts(results, query);
   const { items, total, totalPages } = paginate(filtered, page, PER_PAGE);
   const from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
   const to = Math.min(page * PER_PAGE, total);

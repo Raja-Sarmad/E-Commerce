@@ -5,8 +5,10 @@ import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { blogPosts } from "@/lib/data/content";
+import { getBlogPosts } from "@/lib/api/server";
 import { formatDate } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "The NovaMart Blog",
@@ -14,8 +16,30 @@ export const metadata: Metadata = {
     "Guides, inspiration, and expert advice on the latest in tech, fashion, home, and beauty.",
 };
 
-export default function BlogPage() {
-  const [featured, ...rest] = blogPosts;
+export default async function BlogPage() {
+  const posts = await getBlogPosts();
+  const [featured, ...rest] = posts.length > 0 ? posts : [];
+  if (!featured) {
+    return (
+      <Container className="py-6">
+        <Breadcrumb items={[{ label: "Blog" }]} />
+        <div className="max-w-2xl py-6">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary">
+            The NovaMart blog
+          </p>
+          <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+            Ideas & inspiration
+          </h1>
+          <p className="mt-4 leading-relaxed text-muted-foreground">
+            Practical buying guides, trend reports, and lifestyle tips from our editors.
+          </p>
+          <p className="mt-8 text-sm text-muted-foreground">
+            No articles published yet. Check back soon.
+          </p>
+        </div>
+      </Container>
+    );
+  }
 
   return (
     <Container className="py-6">

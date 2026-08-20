@@ -8,42 +8,53 @@ import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductDetails } from "@/components/product/ProductDetails";
 import { ReviewsSection } from "@/components/product/ReviewsSection";
 import { ProductSection } from "@/components/home/ProductSection";
-import { getProductBySlug, getRelatedProducts } from "@/lib/data/products";
+import { getProductBySlug } from "@/lib/api/server";
+
+export const dynamic = "force-dynamic";
 
 type ProductPageProps = PageProps<"/shop/[slug]">;
 
 export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const product = getProductBySlug(slug);
-  if (!product) {
+  try {
+    const { slug } = await params;
+    const product = await getProductBySlug(slug);
+    if (!product) {
+      return { title: "Product not found" };
+    }
+    return {
+      title: product.name,
+      description: product.description,
+      keywords: product.tags,
+      openGraph: {
+        title: `${product.name} | NovaMart`,
+        description: product.description,
+        images: [product.images?.[0] ?? ""],
+        type: "website",
+      },
+    };
+  } catch {
     return { title: "Product not found" };
   }
-  return {
-    title: product.name,
-    description: product.description,
-    keywords: product.tags,
-    openGraph: {
-      title: `${product.name} | NovaMart`,
-      description: product.description,
-      images: [product.images[0]],
-      type: "website",
-    },
-  };
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const { slug } = await params;
-  const product = getProductBySlug(slug);
+  let product;
+  try {
+    const { slug } = await params;
+    product = await getProductBySlug(slug);
+  } catch {
+    notFound();
+  }
 
   if (!product) {
     notFound();
   }
 
-  const related = getRelatedProducts(product);
+  const { related } = product;
 
-  const specsEntries = Object.entries(product.specifications);
+  const specsEntries = product.specifications ? Object.entries(product.specifications as Record<string, unknown>) : [];
 
   return (
     <div className="py-6">
@@ -109,7 +120,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                           }`}
                         >
                           <dt className="font-semibold text-foreground">{key}</dt>
-                          <dd className="text-muted-foreground">{value}</dd>
+                          <dd className="text-muted-foreground">{String(value)}</dd>
                         </div>
                       ))}
                     </dl>

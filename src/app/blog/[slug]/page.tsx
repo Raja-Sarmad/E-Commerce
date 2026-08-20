@@ -7,8 +7,10 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { blogPosts, getBlogPostBySlug, getRelatedPosts } from "@/lib/data/content";
+import { getBlogPostBySlug, getBlogPosts } from "@/lib/api/server";
 import { formatDate } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 type BlogPostPageProps = PageProps<"/blog/[slug]">;
 
@@ -16,7 +18,7 @@ export async function generateMetadata({
   params,
 }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlug(slug);
   if (!post) return { title: "Post not found" };
   return {
     title: post.title,
@@ -33,17 +35,14 @@ export async function generateMetadata({
   };
 }
 
-export function generateStaticParams() {
-  return blogPosts.map((post) => ({ slug: post.slug }));
-}
-
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlug(slug);
 
   if (!post) notFound();
 
-  const related = getRelatedPosts(slug, 3);
+  const allPosts = await getBlogPosts(9);
+  const related = allPosts.filter((p) => p.slug !== slug).slice(0, 3);
 
   return (
     <Container className="py-6">

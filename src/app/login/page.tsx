@@ -6,17 +6,17 @@ import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
 import { AuthShell, AuthFooter } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { useAuth } from "@/context/AuthProvider";
-import { useToast } from "@/context/ToastProvider";
+import { useLoginMutation, useGetMeQuery } from "@/lib/rtk/authApi";
+import { toast } from "@/hooks/use-toast";
 
 const demoCredentials = [
-  { email: "rachel@novamart.com", password: "demo1234", role: "Customer" },
-  { email: "admin@novamart.com", password: "admin123", role: "Admin" },
+  { email: "admin@novamart.com", password: "Admin@123456", role: "Admin" },
+  { email: "rachel@example.com", password: "Customer@123", role: "Customer" },
 ];
 
 export default function LoginPage() {
-  const { login, user } = useAuth();
-  const { success, error } = useToast();
+  const [loginMutation, { isLoading: loginLoading }] = useLoginMutation();
+  const { data: user } = useGetMeQuery();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +25,13 @@ export default function LoginPage() {
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (user) router.replace("/account/profile");
+    if (!user) return;
+    const adminRoles = ["admin", "super_admin", "manager", "staff"];
+    if (adminRoles.includes(user.role ?? "")) {
+      router.replace("/admin");
+    } else {
+      router.replace("/account/profile");
+    }
   }, [user, router]);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -36,15 +42,20 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    const ok = await login(email, password);
-    setLoading(false);
-    if (ok) {
-      success("Welcome back!", "You have signed in successfully.");
-      router.push("/account/profile");
-    } else {
+    try {
+      const user = await loginMutation({ email, password }).unwrap();
+      toast.success("Welcome back!", "You have signed in successfully.");
+      const adminRoles = ["admin", "super_admin", "manager", "staff"];
+      if (adminRoles.includes(user.role ?? "")) {
+        router.push("/admin");
+      } else {
+        router.push("/account/profile");
+      }
+    } catch {
       setFormError("Invalid credentials. Try one of the demo accounts below.");
-      error("Sign in failed", "Invalid email or password.");
+      toast.error("Sign in failed", "Invalid email or password.");
     }
+    setLoading(false);
   };
 
   return (

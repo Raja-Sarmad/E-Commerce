@@ -47,6 +47,7 @@ export type Product = {
   discountPercent: number;
   colors: string[];
   sizes?: string[];
+  position: number;
   createdAt: string;
   reviews: Review[];
 };

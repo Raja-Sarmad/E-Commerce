@@ -9,7 +9,7 @@ import { FilterSidebar } from "./FilterSidebar";
 import { cn } from "@/lib/utils";
 
 export const sortOptions = [
-  { value: "featured", label: "Featured" },
+  { value: "position", label: "Default" },
   { value: "newest", label: "Newest" },
   { value: "price-asc", label: "Price: Low to High" },
   { value: "price-desc", label: "Price: High to Low" },
@@ -30,14 +30,35 @@ export function ShopToolbar({ total, showingFrom, showingTo }: ShopToolbarProps)
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [view, setView] = useState<"grid" | "list">("grid");
 
-  const sort = searchParams.get("sort") ?? "featured";
+  const sortParam = searchParams.get("sort") ?? "";
+  const reverseSortMap: Record<string, string> = {
+    "": "position",
+    createdAt: "newest",
+    price: "price-asc",
+    "-price": "price-desc",
+    "-rating": "rating",
+    name: "name-asc",
+    "-name": "name-desc",
+  };
+  const sort = reverseSortMap[sortParam] ?? "position";
+
+  const sortMap: Record<string, string> = {
+    position: "",
+    newest: "createdAt",
+    "price-asc": "price",
+    "price-desc": "-price",
+    rating: "-rating",
+    "name-asc": "name",
+    "name-desc": "-name",
+  };
 
   const handleSort = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (value === "featured") {
+    const mapped = sortMap[value] ?? "";
+    if (!mapped) {
       params.delete("sort");
     } else {
-      params.set("sort", value);
+      params.set("sort", mapped);
     }
     router.push(`/shop?${params.toString()}`);
   };

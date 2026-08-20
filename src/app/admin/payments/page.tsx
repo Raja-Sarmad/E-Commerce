@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FiCreditCard, FiSearch } from "react-icons/fi";
+import { FiCreditCard } from "react-icons/fi";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -12,15 +12,21 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { useToast } from "@/context/ToastProvider";
-import { paymentMethods, transactions, type PaymentMethodConfig, type Transaction } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminPaymentMethodsQuery,
+  useGetAdminTransactionsQuery,
+  useUpdatePaymentMethodMutation,
+  type AdminPaymentMethod,
+  type AdminTransaction,
+} from "@/lib/rtk/adminApi";
 import { formatPrice, formatDate } from "@/lib/utils";
 
 const PER_PAGE = 8;
 
 const cardLikeIcons = ["stripe", "paypal", "applepay", "googlepay"];
 
-function methodGlyph(method: PaymentMethodConfig) {
+function methodGlyph(method: AdminPaymentMethod) {
   if (cardLikeIcons.includes(method.icon)) {
     return <FiCreditCard className="h-5 w-5" aria-hidden />;
   }
@@ -43,26 +49,37 @@ function prettyKey(key: string) {
 }
 
 export default function AdminPaymentsPage() {
-  const { info } = useToast();
-  const [methods, setMethods] = useState<PaymentMethodConfig[]>(paymentMethods);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
-  const [configureTarget, setConfigureTarget] = useState<PaymentMethodConfig | null>(null);
+  const [configureTarget, setConfigureTarget] = useState<AdminPaymentMethod | null>(null);
 
-  const toggleMethod = (method: PaymentMethodConfig) => {
-    const updated = { ...method, enabled: !method.enabled };
-    setMethods((prev) => prev.map((m) => (m.id === method.id ? updated : m)));
-    info(
-      updated.enabled ? "Method enabled" : "Method disabled",
-      `${method.name} is now ${updated.enabled ? "active" : "inactive"}.`
-    );
+  const { data: methodsData, isLoading: methodsLoading } = useGetAdminPaymentMethodsQuery();
+  const { data: transactionsData, isLoading: transactionsLoading } = useGetAdminTransactionsQuery({});
+  const [updatePaymentMethod] = useUpdatePaymentMethodMutation();
+
+  const methods = useMemo(() => methodsData?.items ?? [], [methodsData]);
+  const allTransactions = useMemo(() => transactionsData?.items ?? [], [transactionsData]);
+
+  const toggleMethod = async (method: AdminPaymentMethod) => {
+    try {
+      await updatePaymentMethod({
+        id: method._id,
+        body: { enabled: !method.enabled },
+      }).unwrap();
+      toast.info(
+        !method.enabled ? "Method enabled" : "Method disabled",
+        `${method.name} is now ${!method.enabled ? "active" : "inactive"}.`
+      );
+    } catch {
+      toast.error("Update failed", "Could not update payment method.");
+    }
   };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return transactions.filter((t) => {
+    return allTransactions.filter((t) => {
       const matchesQuery =
         !q ||
         t.reference.toLowerCase().includes(q) ||
@@ -71,12 +88,12 @@ export default function AdminPaymentsPage() {
       const matchesStatus = status === "all" || t.status === status;
       return matchesQuery && matchesStatus;
     });
-  }, [query, status]);
+  }, [allTransactions, query, status]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const columns: Column<Transaction>[] = [
+  const columns: Column<AdminTransaction>[] = [
     {
       key: "reference",
       header: "Reference",
@@ -124,8 +141,8 @@ export default function AdminPaymentsPage() {
       key: "date",
       header: "Date",
       sortable: true,
-      sortValue: (t) => t.date,
-      render: (t) => <span className="text-muted-foreground">{formatDate(t.date)}</span>,
+      sortValue: (t) => t.createdAt,
+      render: (t) => <span className="text-muted-foreground">{formatDate(t.createdAt)}</span>,
     },
   ];
 
@@ -141,7 +158,7 @@ export default function AdminPaymentsPage() {
         <h2 className="text-lg font-bold text-foreground">Payment methods</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {methods.map((method) => (
-            <Card key={method.id} className="flex flex-col p-5">
+            <Card key={method._id} className="flex flex-col p-5">
               <div className="flex items-start justify-between gap-4">
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   {methodGlyph(method)}
@@ -214,17 +231,17 @@ export default function AdminPaymentsPage() {
                 Fee: t.fee,
                 Method: t.method,
                 Status: t.status,
-                Date: t.date,
+                Date: t.createdAt,
               }))}
               disabled={filtered.length === 0}
             />
           }
         />
 
-        <DataTable<Transaction>
+        <DataTable<AdminTransaction>
           columns={columns}
           rows={pageItems}
-          rowKey={(t) => t.id}
+          rowKey={(t) => t._id}
           pagination={{
             page,
             totalPages,

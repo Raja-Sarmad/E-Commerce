@@ -1,54 +1,32 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FiImage,
   FiLink,
-  FiList,
   FiPlus,
   FiSave,
-  FiTag,
   FiTrash2,
+  FiUpload,
   FiX,
 } from "react-icons/fi";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Badge } from "@/components/ui/Badge";
-import { useToast } from "@/context/ToastProvider";
-import { categories } from "@/lib/data/categories";
-import { saveProduct, generateProductId } from "@/lib/products-store";
+import { toast } from "@/hooks/use-toast";
+import { useCategories } from "@/hooks/use-catalog";
+import {
+  useCreateProductMutation,
+  useUpdateProductMutation,
+} from "@/lib/rtk/adminApi";
+import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { slugify, formatPrice } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
-const brandOptions = [
-  "Sonix",
-  "TechOne",
-  "Vortex",
-  "Aura & Oak",
-  "Lumen",
-  "Northbound",
-  "Botaniq",
-  "TrailPeak",
-];
-
-const sizeOptions = ["XS", "S", "M", "L", "XL", "XXL", "One Size"];
-const colorOptions = [
-  "Black",
-  "White",
-  "Grey",
-  "Navy",
-  "Red",
-  "Green",
-  "Blue",
-  "Beige",
-  "Pink",
-  "Silver",
-];
+const maxImageSizeMb = 5;
 
 function SectionCard({
   title,
@@ -140,6 +118,10 @@ function ListEditor({
   );
 }
 
+type ImageEntry =
+  | { kind: "file"; file: File; preview: string }
+  | { kind: "url"; url: string };
+
 type ProductFormProps = {
   initial?: Product;
   mode: "create" | "edit";
@@ -160,7 +142,7 @@ const emptyForm = {
   tags: [] as string[],
   colors: [] as string[],
   sizes: [] as string[],
-  images: [] as string[],
+  position: "",
   isFeatured: false,
   isBestSeller: false,
   isNew: true,
@@ -170,7 +152,10 @@ const emptyForm = {
 
 export function ProductForm({ initial, mode }: ProductFormProps) {
   const router = useRouter();
-  const { success, error } = useToast();
+  const { data: categories = [] } = useCategories();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [createProduct] = useCreateProductMutation();
+  const [updateProduct] = useUpdateProductMutation();
 
   const [form, setForm] = useState(() =>
     initial
@@ -191,7 +176,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
           tags: [...initial.tags],
           colors: [...initial.colors],
           sizes: [...(initial.sizes ?? [])],
-          images: [...initial.images],
+          position: initial.position != null ? String(initial.position) : "",
           isFeatured: initial.isFeatured,
           isBestSeller: initial.isBestSeller,
           isNew: initial.isNew,
@@ -200,6 +185,14 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         }
       : { ...emptyForm }
   );
+
+  const [images, setImages] = useState<ImageEntry[]>(() => {
+    if (initial?.images) {
+      return initial.images.map((url) => ({ kind: "url" as const, url }));
+    }
+    return [];
+  });
+
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -231,66 +224,108 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     if (!form.sku.trim()) errors.sku = "SKU is required.";
     if (!form.stock.trim() || Number(form.stock) < 0)
       errors.stock = "Stock must be 0 or greater.";
-    if (form.images.length === 0)
+    if (images.length === 0)
       errors.images = "Add at least one product image.";
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) {
-      error("Validation failed", "Please fix the highlighted fields.");
+      toast.error("Validation failed", "Please fix the highlighted fields.");
       return;
     }
     setSaving(true);
-    const price = Number(form.price);
-    const compareAtPrice = form.compareAtPrice
-      ? Number(form.compareAtPrice)
-      : undefined;
-    const discountPercent =
-      compareAtPrice && compareAtPrice > price
-        ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
-        : 0;
 
-    const product: Product = {
-      id: initial?.id ?? generateProductId(),
-      slug: form.slug.trim() || slugify(form.name),
-      name: form.name.trim(),
-      brand: form.brand,
-      category: form.category,
-      categorySlug: form.categorySlug,
-      description: form.description.trim(),
-      features: form.features,
-      specifications: initial?.specifications ?? {},
-      price,
-      compareAtPrice,
-      images: form.images.filter(Boolean),
-      rating: initial?.rating ?? 0,
-      reviewsCount: initial?.reviewsCount ?? 0,
-      stock: Number(form.stock),
-      sku: form.sku.trim(),
-      tags: form.tags,
-      isFeatured: form.isFeatured,
-      isBestSeller: form.isBestSeller,
-      isNew: form.isNew,
-      isTrending: form.isTrending,
-      onSale: form.onSale,
-      discountPercent,
-      colors: form.colors,
-      sizes: form.sizes,
-      createdAt: initial?.createdAt ?? new Date().toISOString(),
-      reviews: initial?.reviews ?? [],
-    };
+    const formData = new FormData();
+    formData.append("name", form.name.trim());
+    formData.append("slug", form.slug.trim() || slugify(form.name));
+    formData.append("brand", form.brand);
+    formData.append("category", form.category);
+    formData.append("categorySlug", form.categorySlug);
+    formData.append("description", form.description.trim());
+    formData.append("price", form.price);
+    if (form.compareAtPrice) formData.append("compareAtPrice", form.compareAtPrice);
+    formData.append("stock", form.stock);
+    formData.append("sku", form.sku.trim());
+    formData.append("position", form.position || "0");
+    formData.append("isFeatured", String(form.isFeatured));
+    formData.append("isBestSeller", String(form.isBestSeller));
+    formData.append("isNew", String(form.isNew));
+    formData.append("isTrending", String(form.isTrending));
+    formData.append("onSale", String(form.onSale));
 
-    saveProduct(product);
-    setTimeout(() => {
+    form.features.forEach((f) => formData.append("features", f));
+    form.tags.forEach((t) => formData.append("tags", t));
+    form.colors.forEach((c) => formData.append("colors", c));
+    form.sizes.forEach((s) => formData.append("sizes", s));
+
+    const urlImages: string[] = [];
+    for (const entry of images) {
+      if (entry.kind === "file") {
+        formData.append("images", entry.file);
+      } else {
+        urlImages.push(entry.url);
+      }
+    }
+    if (urlImages.length > 0) {
+      formData.append("imageUrls", JSON.stringify(urlImages));
+    }
+
+    try {
+      if (mode === "edit" && initial) {
+        await updateProduct({ id: initial.id, body: formData }).unwrap();
+      } else {
+        await createProduct(formData).unwrap();
+      }
       setSaving(false);
-      success(
+      toast.success(
         mode === "edit" ? "Product updated" : "Product created",
-        `“${product.name}” was ${mode === "edit" ? "updated" : "added to your catalog"}.`
+        `"${form.name.trim()}" was ${mode === "edit" ? "updated" : "added to your catalog"}.`
       );
       router.push("/admin/products");
-    }, 400);
+    } catch (err) {
+      setSaving(false);
+      toast.error(
+        mode === "edit" ? "Could not update product" : "Could not create product",
+        getErrorMessage(err)
+      );
+    }
+  };
+
+  const handleFileSelect = (fileList: FileList | null) => {
+    if (!fileList) return;
+    const newEntries: ImageEntry[] = [];
+    for (const file of Array.from(fileList)) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Unsupported file", `"${file.name}" is not an image.`);
+        continue;
+      }
+      if (file.size > maxImageSizeMb * 1024 * 1024) {
+        toast.error("File too large", `"${file.name}" exceeds ${maxImageSizeMb} MB limit.`);
+        continue;
+      }
+      newEntries.push({ kind: "file", file, preview: URL.createObjectURL(file) });
+    }
+    if (newEntries.length > 0) {
+      setImages((prev) => [...prev, ...newEntries]);
+      if (fieldErrors.images) {
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next.images;
+          return next;
+        });
+      }
+      toast.success("Images added", `${newEntries.length} image(s) ready to upload.`);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => {
+      const removed = prev[index];
+      if (removed?.kind === "file") URL.revokeObjectURL(removed.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const toggleFlag = (key: keyof typeof emptyForm) => {
@@ -319,28 +354,30 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             leftIcon={<FiLink className="h-4 w-4" aria-hidden />}
             placeholder="aurora-wireless-headphones-pro"
           />
-          <Select
+          <Input
             label="Brand"
             value={form.brand}
             onChange={(e) => set("brand", e.target.value)}
-          >
-            {brandOptions.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Category"
-            value={form.category}
-            onChange={(e) => selectCategory(e.target.value)}
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+            placeholder="e.g. Sonix, TechOne, or your own brand"
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">Category</label>
+            <input
+              list="category-list"
+              value={form.category}
+              onChange={(e) => {
+                selectCategory(e.target.value);
+              }}
+              placeholder="e.g. Electronics, Fashion, Home & Living"
+              className="flex h-10 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <datalist id="category-list">
+              {categories.map((c) => (
+                <option key={c.id} value={c.name} />
+              ))}
+            </datalist>
+            <p className="text-xs text-muted-foreground">Type a new category or pick from suggestions.</p>
+          </div>
           <Textarea
             label="Description"
             value={form.description}
@@ -399,8 +436,8 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         </div>
       </SectionCard>
 
-      <SectionCard title="Inventory" description="SKU and stock control.">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <SectionCard title="Inventory" description="SKU, stock and display order.">
+        <div className="grid gap-4 sm:grid-cols-3">
           <Input
             label="SKU"
             value={form.sku}
@@ -417,61 +454,107 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             error={fieldErrors.stock}
             placeholder="50"
           />
+          <Input
+            label="Display position"
+            type="number"
+            min="0"
+            value={form.position}
+            onChange={(e) => set("position", e.target.value)}
+            hint="Lower = shown first. 0 = default order."
+            placeholder="0"
+          />
         </div>
       </SectionCard>
 
       <SectionCard
         title="Images"
-        description="Product photos shown on the storefront."
+        description="Product photos shown on the storefront. Upload from your device or paste URLs."
       >
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            leftIcon={<FiUpload className="h-4 w-4" aria-hidden />}
+          >
+            Upload from device
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.avif,.heic,.heif,.bmp,.tiff,.tif,.ico,.svg"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleFileSelect(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <span className="text-xs text-muted-foreground">
+            Supports JPG, PNG, WebP, GIF, SVG, AVIF, HEIC, BMP, TIFF and more.
+          </span>
+        </div>
+
         <ListEditor
-          label="Image URLs"
-          value={form.images}
-          onChange={(next) => set("images", next)}
-          placeholder="https://picsum.photos/seed/..."
+          label="Or paste image URLs"
+          value={images.filter((e) => e.kind === "url").map((e) => e.url)}
+          onChange={(urls) => {
+            setImages((prev) => {
+              const fileImages = prev.filter((e): e is Extract<ImageEntry, { kind: "file" }> => e.kind === "file");
+              const urlImages = urls.map((url) => ({ kind: "url" as const, url }));
+              return [...fileImages, ...urlImages];
+            });
+          }}
+          placeholder="https://example.com/image.jpg"
           hint="Add image URLs one at a time. First image is the primary photo."
         />
+
         {fieldErrors.images && (
           <p className="mt-1.5 text-xs font-medium text-destructive">
             {fieldErrors.images}
           </p>
         )}
-        {form.images.length > 0 && (
+
+        {images.length > 0 && (
           <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
-            {form.images.map((src, i) => (
-              <div
-                key={`${src}-${i}`}
-                className={cn(
-                  "group relative aspect-square overflow-hidden rounded-xl border border-border",
-                  i === 0 && "ring-2 ring-primary"
-                )}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt={`Product image ${i + 1}`}
-                  className="h-full w-full object-cover"
-                />
-                {i === 0 && (
-                  <span className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    Primary
-                  </span>
-                )}
-                <button
-                  type="button"
-                  aria-label={`Remove image ${i + 1}`}
-                  onClick={() =>
-                    set(
-                      "images",
-                      form.images.filter((_, idx) => idx !== i)
-                    )
-                  }
-                  className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+            {images.map((entry, i) => {
+              const src = entry.kind === "file" ? entry.preview : entry.url;
+              return (
+                <div
+                  key={`${src}-${i}`}
+                  className={cn(
+                    "group relative aspect-square overflow-hidden rounded-xl border border-border",
+                    i === 0 && "ring-2 ring-primary"
+                  )}
                 >
-                  <FiTrash2 className="h-3.5 w-3.5" aria-hidden />
-                </button>
-              </div>
-            ))}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={`Product image ${i + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                  {entry.kind === "file" && (
+                    <span className="absolute left-1 bottom-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      Local
+                    </span>
+                  )}
+                  {i === 0 && (
+                    <span className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      Primary
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`Remove image ${i + 1}`}
+                    onClick={() => removeImage(i)}
+                    className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    <FiTrash2 className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </SectionCard>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   FiBox,
@@ -21,9 +21,11 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
-import { useToast } from "@/context/ToastProvider";
-import { readOrders } from "@/lib/orders-store";
-import { sampleOrders } from "@/lib/data/content";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetOrdersQuery,
+  useUpdateOrderStatusMutation,
+} from "@/lib/rtk/adminApi";
 import { formatPrice, formatNumber, formatDate } from "@/lib/utils";
 import type { Order, OrderStatus } from "@/lib/types";
 
@@ -38,9 +40,6 @@ const statusOptions: OrderStatus[] = [
 const PER_PAGE = 8;
 
 export default function AdminOrdersPage() {
-  const { success, info } = useToast();
-  const [items, setItems] = useState<Order[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
@@ -49,26 +48,36 @@ export default function AdminOrdersPage() {
   const [bulkStatus, setBulkStatus] = useState<OrderStatus>("processing");
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
 
-  useEffect(() => {
-    setItems([...readOrders(), ...sampleOrders]);
-    setLoaded(true);
-  }, []);
+  const { data, isLoading } = useGetOrdersQuery({
+    page,
+    limit: pageSize,
+    search: query || undefined,
+    status: status !== "all" ? status : undefined,
+  });
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((o) => {
-      const matchesQuery =
-        !q ||
-        o.number.toLowerCase().includes(q) ||
-        o.shippingAddress.firstName.toLowerCase().includes(q) ||
-        o.shippingAddress.lastName.toLowerCase().includes(q);
-      const matchesStatus = status === "all" || o.status === status;
-      return matchesQuery && matchesStatus;
-    });
-  }, [items, query, status]);
+  const [updateOrderStatus] = useUpdateOrderStatusMutation();
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const items = useMemo(() => {
+    const raw = data?.items ?? [];
+    return raw.map((o) => ({
+      ...o,
+      shippingAddress: o.shippingAddress ?? {
+        firstName: (o as any).user?.name?.split(" ")[0] ?? "",
+        lastName: (o as any).user?.name?.split(" ").slice(1).join(" ") ?? "",
+        address: "",
+        city: "",
+        state: "",
+        zip: "",
+        country: "",
+        phone: "",
+      },
+    }));
+  }, [data]);
+
+  const filtered = items;
+
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
+  const totalItems = data?.total ?? filtered.length;
 
   const stats = useMemo(() => {
     const valid = items.filter((o) => o.status !== "cancelled");
@@ -81,31 +90,52 @@ export default function AdminOrdersPage() {
   }, [items]);
 
   const changeStatus = (order: Order, next: OrderStatus) => {
-    setItems((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, status: next } : o))
-    );
-    info("Status updated", `Order #${order.number} is now ${next}.`);
+    updateOrderStatus({ id: order.id, status: next })
+      .unwrap()
+      .then(() => {
+        toast.info("Status updated", `Order #${order.number} is now ${next}.`);
+      })
+      .catch(() => {
+        toast.warning("Error", "Failed to update order status.");
+      });
   };
 
   const changeBulkStatus = () => {
     const ids = [...selected];
-    setItems((prev) =>
-      prev.map((o) => (ids.includes(o.id) ? { ...o, status: bulkStatus } : o))
-    );
-    success("Bulk update", `${ids.length} orders updated to “${bulkStatus}”.`);
-    setSelected(new Set());
+    Promise.all(
+      ids.map((id) =>
+        updateOrderStatus({ id, status: bulkStatus }).unwrap()
+      )
+    )
+      .then(() => {
+        toast.success("Bulk update", `${ids.length} orders updated to "${bulkStatus}".`);
+        setSelected(new Set());
+      })
+      .catch(() => {
+        toast.warning("Error", "Failed to update some orders.");
+      });
   };
 
   const cancelOrder = (order: Order) => {
-    setItems((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, status: "cancelled" } : o))
-    );
-    setCancelTarget(null);
-    success("Order cancelled", `Order #${order.number} was cancelled.`);
+    updateOrderStatus({ id: order.id, status: "cancelled" })
+      .unwrap()
+      .then(() => {
+        setCancelTarget(null);
+        toast.success("Order cancelled", `Order #${order.number} was cancelled.`);
+      })
+      .catch(() => {
+        toast.warning("Error", "Failed to cancel order.");
+      });
   };
 
-  const customerName = (o: Order) =>
-    `${o.shippingAddress.firstName} ${o.shippingAddress.lastName}`;
+  const customerName = (o: Order) => {
+    const user = (o as any).user as { name?: string; email?: string } | undefined;
+    if (user?.name) return user.name;
+    if (o.shippingAddress) {
+      return `${o.shippingAddress.firstName} ${o.shippingAddress.lastName}`.trim();
+    }
+    return "Unknown";
+  };
 
   const columns: Column<Order>[] = [
     {
@@ -208,7 +238,7 @@ export default function AdminOrdersPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Orders"
-        subtitle={`Track and manage customer orders — ${items.length} total.`}
+        subtitle={`Track and manage customer orders — ${totalItems} total.`}
         breadcrumb={[{ label: "Orders" }]}
         actions={
           <ExportButton
@@ -222,7 +252,7 @@ export default function AdminOrdersPage() {
               Status: o.status,
               Payment: o.paymentMethod,
             }))}
-            disabled={!loaded || filtered.length === 0}
+            disabled={isLoading || filtered.length === 0}
           />
         }
       />
@@ -289,9 +319,9 @@ export default function AdminOrdersPage() {
 
       <DataTable<Order>
         columns={columns}
-        rows={pageItems}
+        rows={filtered}
         rowKey={(o) => o.id}
-        loading={!loaded}
+        loading={isLoading}
         selectable
         selectedKeys={selected}
         onSelectionChange={setSelected}
@@ -319,7 +349,7 @@ export default function AdminOrdersPage() {
         pagination={{
           page,
           totalPages,
-          totalItems: filtered.length,
+          totalItems,
           pageSize,
           onPageChange: setPage,
           onPageSizeChange: (size) => {

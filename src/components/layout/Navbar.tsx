@@ -14,27 +14,34 @@ import {
   FiUser,
   FiX,
 } from "react-icons/fi";
+import { useSelector, useDispatch } from "react-redux";
 import { Logo } from "./Logo";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { MobileNav } from "./MobileNav";
 import { SearchOverlay } from "./SearchOverlay";
 import { CartDrawer } from "./CartDrawer";
-import { useCart } from "@/context/CartProvider";
-import { useWishlist } from "@/context/WishlistProvider";
-import { useTheme } from "@/context/ThemeProvider";
-import { useAuth } from "@/context/AuthProvider";
+import { useTheme } from "@/hooks/use-theme";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import {
+  useGetMeQuery,
+} from "@/lib/rtk/authApi";
+import { selectCartCount } from "@/lib/rtk/cartSlice";
+import { selectWishlistItems } from "@/lib/rtk/wishlistSlice";
 import { navLinks } from "@/lib/site";
-import { categories } from "@/lib/data/categories";
+import { useGetStorefrontCategoriesQuery } from "@/lib/rtk/storefrontApi";
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
-  const { count: cartCount } = useCart();
-  const { items: wishlistItems } = useWishlist();
+  const cartCount = useSelector(selectCartCount);
+  const wishlistItems = useSelector(selectWishlistItems);
   const { theme, toggleTheme } = useTheme();
-  const { user, isAdmin } = useAuth();
+  const { data: user } = useGetMeQuery();
+  const { data: categories = [] } = useGetStorefrontCategoriesQuery();
   const pathname = usePathname();
   const router = useRouter();
+
+  const { isAdmin } = useIsAdmin();
 
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -152,7 +159,7 @@ export function Navbar() {
                   )}
                 </Link>
 
-                {user && isAdmin && (
+                {isAdmin && (
                   <Link
                     href="/admin"
                     className="hidden rounded-lg px-2.5 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 xl:block"
@@ -161,23 +168,25 @@ export function Navbar() {
                   </Link>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => setCartOpen(true)}
-                  aria-label={`Cart, ${cartCount} items`}
-                  className="relative rounded-lg p-2.5 text-foreground transition-colors hover:bg-muted"
-                >
-                  <FiShoppingBag className="h-5 w-5" aria-hidden />
-                  {cartCount > 0 && (
-                    <span className="animate-pulse-ring absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                      {cartCount}
-                    </span>
-                  )}
-                </button>
+                {!isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setCartOpen(true)}
+                    aria-label={`Cart, ${cartCount} items`}
+                    className="relative rounded-lg p-2.5 text-foreground transition-colors hover:bg-muted"
+                  >
+                    <FiShoppingBag className="h-5 w-5" aria-hidden />
+                    {cartCount > 0 && (
+                      <span className="animate-pulse-ring absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                        {cartCount}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
-            <DesktopNav />
+            <DesktopNav categories={categories} />
           </Container>
         </div>
       </header>
@@ -195,7 +204,7 @@ export function Navbar() {
   );
 }
 
-function DesktopNav() {
+function DesktopNav({ categories }: { categories: any[] }) {
   const [megaOpen, setMegaOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();

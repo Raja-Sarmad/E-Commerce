@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import { siteConfig } from "@/lib/site";
 
 const contactMethods = [
@@ -40,7 +40,6 @@ const contactMethods = [
 ];
 
 export default function ContactPage() {
-  const { success } = useToast();
   const [sending, setSending] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -55,7 +54,7 @@ export default function ContactPage() {
     await new Promise((resolve) => setTimeout(resolve, 900));
     setSending(false);
     setForm({ name: "", email: "", subject: "Order support", message: "" });
-    success("Message sent!", "Thanks for reaching out — we'll reply within 24 hours.");
+    toast.success("Message sent!", "Thanks for reaching out — we'll reply within 24 hours.");
   };
 
   return (

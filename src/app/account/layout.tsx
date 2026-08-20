@@ -10,9 +10,12 @@ import {
   FiPackage,
   FiUser,
 } from "react-icons/fi";
+import { useGetMeQuery, useLogoutMutation } from "@/lib/rtk/authApi";
+import { useDispatch } from "react-redux";
+import { clearAuthCookies } from "@/lib/rtk/authSlice";
+import { baseApi } from "@/lib/rtk/baseApi";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
-import { useAuth } from "@/context/AuthProvider";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -23,13 +26,15 @@ const links = [
 ];
 
 export default function AccountLayout({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { data: user, isLoading } = useGetMeQuery();
+  const [logoutMutation] = useLogoutMutation();
+  const dispatch = useDispatch();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) router.replace("/login");
-  }, [isAuthenticated, router]);
+    if (!isLoading && !user) router.replace("/login");
+  }, [user, isLoading, router]);
 
   if (!user) {
     return (
@@ -75,9 +80,15 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
               })}
               <button
                 type="button"
-                onClick={() => {
-                  logout();
-                  router.push("/login");
+                onClick={async () => {
+                  try {
+                    await logoutMutation().unwrap();
+                  } catch {
+                    // Ignore errors — clear local state anyway
+                  }
+                  dispatch(clearAuthCookies());
+                  dispatch(baseApi.util.resetApiState());
+                  router.push("/");
                 }}
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
               >

@@ -8,12 +8,12 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { useAuth } from "@/context/AuthProvider";
-import { useToast } from "@/context/ToastProvider";
+import { useGetMeQuery, useUpdateProfileMutation } from "@/lib/rtk/authApi";
+import { toast } from "@/hooks/use-toast";
 
 export default function EditProfilePage() {
-  const { user, updateProfile } = useAuth();
-  const { success } = useToast();
+  const { data: user } = useGetMeQuery();
+  const [updateProfile] = useUpdateProfileMutation();
   const router = useRouter();
 
   const [form, setForm] = useState({
@@ -32,29 +32,31 @@ export default function EditProfilePage() {
 
   if (!user) return null;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    updateProfile({
-      name: form.name,
-      email: form.email,
-      phone: form.phone,
-      address: {
-        firstName: form.firstName,
-        lastName: form.lastName,
-        address: form.address,
-        city: form.city,
-        state: form.state,
-        zip: form.zip,
-        country: form.country,
+    try {
+      await updateProfile({
+        name: form.name,
+        email: form.email,
         phone: form.phone,
-      },
-    });
-    setTimeout(() => {
-      setSaving(false);
-      success("Profile updated", "Your changes have been saved.");
+        address: {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          address: form.address,
+          city: form.city,
+          state: form.state,
+          zip: form.zip,
+          country: form.country,
+          phone: form.phone,
+        },
+      }).unwrap();
+      toast.success("Profile updated", "Your changes have been saved.");
       router.push("/account/profile");
-    }, 500);
+    } catch {
+      toast.error("Update failed", "Could not save profile changes.");
+    }
+    setSaving(false);
   };
 
   return (

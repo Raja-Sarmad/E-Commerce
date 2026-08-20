@@ -11,6 +11,8 @@ import {
 } from "react-icons/fi";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
+import { useGetMyOrdersQuery } from "@/lib/rtk/authApi";
 import { readOrderByNumber } from "@/lib/orders-store";
 import { sampleOrders } from "@/lib/data/content";
 import { formatPrice, formatDate } from "@/lib/utils";
@@ -18,7 +20,13 @@ import { formatPrice, formatDate } from "@/lib/utils";
 function OrderSuccessInner() {
   const searchParams = useSearchParams();
   const number = searchParams.get("number") ?? "";
-  const order = readOrderByNumber(number) ?? sampleOrders.find((o) => o.number === number);
+  const { data: user } = useGetMeQuery();
+  const isAuthenticated = Boolean(user);
+  const { data: orders = [] } = useGetMyOrdersQuery(undefined, { skip: !isAuthenticated });
+  const order =
+    orders.find((o) => o.number === number) ??
+    readOrderByNumber(number) ??
+    sampleOrders.find((o) => o.number === number);
 
   return (
     <Container className="flex min-h-[60vh] items-center justify-center py-10">

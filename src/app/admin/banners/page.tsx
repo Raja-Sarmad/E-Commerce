@@ -18,17 +18,21 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { useToast } from "@/context/ToastProvider";
-import { banners, generateId } from "@/lib/data/admin";
-import type { Banner } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminBannersQuery,
+  useCreateBannerMutation,
+  useUpdateBannerMutation,
+  useDeleteBannerMutation,
+  type AdminBanner,
+} from "@/lib/rtk/adminApi";
 import { formatNumber } from "@/lib/utils";
 
 const PER_PAGE = 8;
 
-const positionVariant: Record<
-  Banner["position"],
-  "primary" | "accent" | "info" | "warning"
-> = {
+type BannerPosition = "hero" | "promo" | "homepage" | "offer";
+
+const positionVariant: Record<BannerPosition, "primary" | "accent" | "info" | "warning"> = {
   hero: "primary",
   promo: "accent",
   homepage: "info",
@@ -37,7 +41,7 @@ const positionVariant: Record<
 
 type BannerForm = {
   title: string;
-  position: Banner["position"];
+  position: BannerPosition;
   image: string;
   link: string;
   active: boolean;
@@ -52,16 +56,21 @@ const emptyForm: BannerForm = {
 };
 
 export default function AdminBannersPage() {
-  const { success, info, warning } = useToast();
-  const [items, setItems] = useState<Banner[]>(banners);
   const [query, setQuery] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Banner | null>(null);
+  const [editing, setEditing] = useState<AdminBanner | null>(null);
   const [form, setForm] = useState<BannerForm>(emptyForm);
-  const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminBanner | null>(null);
+
+  const { data, isLoading } = useGetAdminBannersQuery({});
+  const [createBanner] = useCreateBannerMutation();
+  const [updateBanner] = useUpdateBannerMutation();
+  const [deleteBanner] = useDeleteBannerMutation();
+
+  const items = useMemo(() => data?.items ?? [], [data]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -79,7 +88,7 @@ export default function AdminBannersPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const ctr = (b: Banner) =>
+  const ctr = (b: AdminBanner) =>
     b.views > 0 ? `${((b.clicks / b.views) * 100).toFixed(2)}%` : "—";
 
   const openAdd = () => {
@@ -88,11 +97,11 @@ export default function AdminBannersPage() {
     setFormOpen(true);
   };
 
-  const openEdit = (banner: Banner) => {
+  const openEdit = (banner: AdminBanner) => {
     setEditing(banner);
     setForm({
       title: banner.title,
-      position: banner.position,
+      position: (banner.position as BannerPosition) || "hero",
       image: banner.image,
       link: banner.link ?? "",
       active: banner.active,
@@ -100,57 +109,66 @@ export default function AdminBannersPage() {
     setFormOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     const title = form.title.trim();
     if (!title) {
-      warning("Title required", "Please enter a banner title.");
+      toast.warning("Title required", "Please enter a banner title.");
       return;
     }
-    if (editing) {
-      const updated: Banner = {
-        ...editing,
-        title,
-        position: form.position,
-        image: form.image.trim() || editing.image,
-        link: form.link.trim() || undefined,
-        active: form.active,
-      };
-      setItems((prev) =>
-        prev.map((b) => (b.id === editing.id ? updated : b))
-      );
-      success("Banner saved", `“${updated.title}” was updated.`);
-    } else {
-      const created: Banner = {
-        id: generateId("bn"),
-        title,
-        position: form.position,
-        image:
-          form.image.trim() ||
-          `https://picsum.photos/seed/banner-${title.toLowerCase().replace(/\s+/g, "-")}/1200/500`,
-        link: form.link.trim() || undefined,
-        active: form.active,
-        views: 0,
-        clicks: 0,
-      };
-      setItems((prev) => [...prev, created]);
-      success("Banner created", `“${created.title}” was added.`);
+    try {
+      if (editing) {
+        await updateBanner({
+          id: editing._id,
+          body: {
+            title,
+            position: form.position,
+            image: form.image.trim() || editing.image,
+            link: form.link.trim(),
+            active: form.active,
+          },
+        }).unwrap();
+        toast.success("Banner saved", `"${title}" was updated.`);
+      } else {
+        await createBanner({
+          title,
+          position: form.position,
+          image:
+            form.image.trim() ||
+            `https://picsum.photos/seed/banner-${title.toLowerCase().replace(/\s+/g, "-")}/1200/500`,
+          link: form.link.trim(),
+          active: form.active,
+        }).unwrap();
+        toast.success("Banner created", `"${title}" was added.`);
+      }
+      setFormOpen(false);
+    } catch {
+      toast.error("Error", "Something went wrong. Please try again.");
     }
-    setFormOpen(false);
   };
 
-  const toggleActive = (banner: Banner) => {
-    const updated = { ...banner, active: !banner.active };
-    setItems((prev) => prev.map((b) => (b.id === banner.id ? updated : b)));
-    info(
-      updated.active ? "Activated" : "Deactivated",
-      `“${banner.title}” is now ${updated.active ? "active" : "inactive"}.`
-    );
+  const toggleActive = async (banner: AdminBanner) => {
+    try {
+      await updateBanner({
+        id: banner._id,
+        body: { active: !banner.active },
+      }).unwrap();
+      toast.info(
+        !banner.active ? "Activated" : "Deactivated",
+        `"${banner.title}" is now ${!banner.active ? "active" : "inactive"}.`
+      );
+    } catch {
+      toast.error("Error", "Failed to update banner status.");
+    }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((b) => b.id !== deleteTarget.id));
-    success("Banner removed", `“${deleteTarget.title}” was deleted.`);
+    try {
+      await deleteBanner(deleteTarget._id).unwrap();
+      toast.success("Banner removed", `"${deleteTarget.title}" was deleted.`);
+    } catch {
+      toast.error("Error", "Failed to delete banner.");
+    }
     setDeleteTarget(null);
   };
 
@@ -159,7 +177,7 @@ export default function AdminBannersPage() {
     setPage(1);
   };
 
-  const columns: Column<Banner>[] = [
+  const columns: Column<AdminBanner>[] = [
     {
       key: "banner",
       header: "Banner",
@@ -187,7 +205,9 @@ export default function AdminBannersPage() {
       sortable: true,
       sortValue: (b) => b.position,
       render: (b) => (
-        <Badge variant={positionVariant[b.position]}>{b.position}</Badge>
+        <Badge variant={positionVariant[b.position as BannerPosition] ?? "primary"}>
+          {b.position}
+        </Badge>
       ),
     },
     {
@@ -297,7 +317,7 @@ export default function AdminBannersPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Banners"
-        subtitle={`Promote your campaigns — ${items.length} banners total.`}
+        subtitle={`Promote your campaigns — ${data?.total ?? items.length} banners total.`}
         breadcrumb={[{ label: "Banners" }]}
         actions={
           <>
@@ -348,34 +368,40 @@ export default function AdminBannersPage() {
         }
       />
 
-      <DataTable<Banner>
-        columns={columns}
-        rows={pageItems}
-        rowKey={(b) => b.id}
-        pagination={{
-          page,
-          totalPages,
-          totalItems: filtered.length,
-          pageSize,
-          onPageChange: setPage,
-          onPageSizeChange: handlePageSize,
-          pageSizeOptions: [8, 16, 24],
-        }}
-        empty={{
-          icon: <FiImage className="h-7 w-7" aria-hidden />,
-          title: "No banners found",
-          description: "Try adjusting your search or filters, or add a new banner.",
-          actionLabel: "Add banner",
-          onAction: openAdd,
-        }}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-muted-foreground">
+          Loading banners…
+        </div>
+      ) : (
+        <DataTable<AdminBanner>
+          columns={columns}
+          rows={pageItems}
+          rowKey={(b) => b._id}
+          pagination={{
+            page,
+            totalPages,
+            totalItems: filtered.length,
+            pageSize,
+            onPageChange: setPage,
+            onPageSizeChange: handlePageSize,
+            pageSizeOptions: [8, 16, 24],
+          }}
+          empty={{
+            icon: <FiImage className="h-7 w-7" aria-hidden />,
+            title: "No banners found",
+            description: "Try adjusting your search or filters, or add a new banner.",
+            actionLabel: "Add banner",
+            onAction: openAdd,
+          }}
+        />
+      )}
 
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? "Edit banner" : "Add banner"}
         subtitle={
-          editing ? `Update “${editing.title}”.` : "Create a new promotional banner."
+          editing ? `Update "${editing.title}".` : "Create a new promotional banner."
         }
         size="lg"
       >
@@ -391,7 +417,7 @@ export default function AdminBannersPage() {
               label="Position"
               value={form.position}
               onChange={(e) =>
-                setForm({ ...form, position: e.target.value as Banner["position"] })
+                setForm({ ...form, position: e.target.value as BannerPosition })
               }
             >
               <option value="hero">Hero</option>
@@ -451,7 +477,7 @@ export default function AdminBannersPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={remove}
         title="Delete banner?"
-        description={`This will permanently remove “${deleteTarget?.title}”. This action cannot be undone.`}
+        description={`This will permanently remove "${deleteTarget?.title}". This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>

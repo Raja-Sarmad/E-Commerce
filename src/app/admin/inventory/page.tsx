@@ -11,11 +11,15 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { ExportButton } from "@/components/admin/ExportButton";
-import { useToast } from "@/context/ToastProvider";
-import { generateId, inventoryHistory as seedHistory, type InventoryEntry } from "@/lib/data/admin";
-import { products as seedProducts } from "@/lib/data/products";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetInventoryHistoryQuery,
+  useGetInventoryLowStockQuery,
+  useAdjustInventoryMutation,
+  useGetAdminProductsQuery,
+  type InventoryEntry,
+} from "@/lib/rtk/adminApi";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
-import type { Product } from "@/lib/types";
 
 const PER_PAGE = 8;
 
@@ -55,9 +59,6 @@ type AdjustmentState = {
 };
 
 export default function AdminInventoryPage() {
-  const { success } = useToast();
-  const [entries, setEntries] = useState<InventoryEntry[]>(seedHistory);
-  const [products, setProducts] = useState<Product[]>(seedProducts);
   const [query, setQuery] = useState("");
   const [direction, setDirection] = useState("all");
   const [page, setPage] = useState(1);
@@ -65,17 +66,34 @@ export default function AdminInventoryPage() {
   const [adjustTarget, setAdjustTarget] = useState<InventoryEntry | null>(null);
   const [form, setForm] = useState<AdjustmentState>({ qty: "", reason: "" });
 
-  const totalUnits = products.reduce((sum, p) => sum + p.stock, 0);
-  const lowStock = products.filter((p) => p.stock < 10).length;
-  const outOfStock = products.filter((p) => p.stock === 0).length;
+  const { data: historyData, isLoading: historyLoading } = useGetInventoryHistoryQuery({});
+  const { data: lowStockItems, isLoading: lowStockLoading } = useGetInventoryLowStockQuery();
+  const { data: productsData } = useGetAdminProductsQuery({});
+  const [adjustInventory, { isLoading: adjusting }] = useAdjustInventoryMutation();
+
+  const entries = useMemo(() => historyData ?? [], [historyData]);
+  const allProducts = useMemo(() => productsData?.items ?? [], [productsData]);
+  const lowStockList = useMemo(() => lowStockItems ?? [], [lowStockItems]);
+
+  const totalUnits = useMemo(
+    () => allProducts.reduce((sum, p) => sum + (p.stock ?? 0), 0),
+    [allProducts]
+  );
+  const lowStock = useMemo(() => lowStockList.length, [lowStockList]);
+  const outOfStock = useMemo(
+    () => allProducts.filter((p) => p.stock === 0).length,
+    [allProducts]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return entries.filter((e) => {
+      const productName = e.product?.name ?? "";
+      const sku = e.product?.sku ?? "";
       const matchesQuery =
         !q ||
-        e.productName.toLowerCase().includes(q) ||
-        e.sku.toLowerCase().includes(q);
+        productName.toLowerCase().includes(q) ||
+        sku.toLowerCase().includes(q);
       const matchesDirection =
         direction === "all" ||
         (direction === "in" && e.adjustment > 0) ||
@@ -92,13 +110,7 @@ export default function AdminInventoryPage() {
     setPage(1);
   };
 
-  const currentStock = (entry: InventoryEntry) => {
-    const latest = entries.find((e) => e.productId === entry.productId);
-    if (latest) return latest.current;
-    return products.find((p) => p.id === entry.productId)?.stock ?? 0;
-  };
-
-  const submitAdjustment = () => {
+  const submitAdjustment = async () => {
     if (!adjustTarget) return;
     const quantity = Number(form.qty);
     if (!Number.isFinite(quantity) || quantity === 0) {
@@ -109,34 +121,23 @@ export default function AdminInventoryPage() {
       setForm((f) => ({ ...f, reasonError: "A reason is required." }));
       return;
     }
-    const previous = currentStock(adjustTarget);
-    const next = previous + quantity;
-    if (next < 0) {
-      setForm((f) => ({ ...f, qtyError: "Stock cannot go below zero." }));
-      return;
+    const productId = adjustTarget.product?.name ? (adjustTarget as Record<string, unknown>)._id as string : "";
+    if (!productId) return;
+    try {
+      await adjustInventory({
+        productId,
+        adjustment: quantity,
+        reason: form.reason.trim(),
+      }).unwrap();
+      setAdjustTarget(null);
+      setForm({ qty: "", reason: "" });
+      toast.success(
+        "Stock adjusted",
+        `${adjustTarget.product?.name ?? "Product"} stock updated by ${quantity > 0 ? "+" : ""}${quantity}.`
+      );
+    } catch {
+      toast.error("Adjustment failed", "Could not adjust stock. Please try again.");
     }
-    const entry: InventoryEntry = {
-      id: generateId("ih"),
-      productId: adjustTarget.productId,
-      productName: adjustTarget.productName,
-      sku: adjustTarget.sku,
-      previous,
-      adjustment: quantity,
-      current: next,
-      reason: form.reason.trim(),
-      user: "admin@novamart.com",
-      date: new Date().toISOString(),
-    };
-    setEntries((prev) => [entry, ...prev]);
-    setProducts((prev) =>
-      prev.map((p) => (p.id === entry.productId ? { ...p, stock: next } : p))
-    );
-    setAdjustTarget(null);
-    setForm({ qty: "", reason: "" });
-    success(
-      "Stock adjusted",
-      `${adjustTarget.productName} is now ${formatNumber(next)} units (${quantity > 0 ? "+" : ""}${quantity}).`
-    );
   };
 
   const openAdjust = (entry: InventoryEntry) => {
@@ -149,13 +150,13 @@ export default function AdminInventoryPage() {
       key: "product",
       header: "Product",
       sortable: true,
-      sortValue: (e) => e.productName,
+      sortValue: (e) => e.product?.name ?? "",
       render: (e) => (
         <div className="min-w-0">
           <p className="max-w-[240px] truncate font-semibold text-foreground">
-            {e.productName}
+            {e.product?.name ?? "Unknown"}
           </p>
-          <p className="truncate text-xs text-muted-foreground">{e.sku}</p>
+          <p className="truncate text-xs text-muted-foreground">{e.product?.sku ?? ""}</p>
         </div>
       ),
     },
@@ -163,16 +164,16 @@ export default function AdminInventoryPage() {
       key: "sku",
       header: "SKU",
       sortable: true,
-      sortValue: (e) => e.sku,
-      render: (e) => <span className="font-mono text-xs text-muted-foreground">{e.sku}</span>,
+      sortValue: (e) => e.product?.sku ?? "",
+      render: (e) => <span className="font-mono text-xs text-muted-foreground">{e.product?.sku ?? ""}</span>,
     },
     {
       key: "previous",
       header: "Previous",
       align: "right",
       sortable: true,
-      sortValue: (e) => e.previous,
-      render: (e) => <span className="text-muted-foreground">{formatNumber(e.previous)}</span>,
+      sortValue: (e) => e.previousStock,
+      render: (e) => <span className="text-muted-foreground">{formatNumber(e.previousStock)}</span>,
     },
     {
       key: "adjustment",
@@ -200,8 +201,8 @@ export default function AdminInventoryPage() {
       header: "Current",
       align: "right",
       sortable: true,
-      sortValue: (e) => e.current,
-      render: (e) => <span className="font-bold text-foreground">{formatNumber(e.current)}</span>,
+      sortValue: (e) => e.newStock,
+      render: (e) => <span className="font-bold text-foreground">{formatNumber(e.newStock)}</span>,
     },
     {
       key: "reason",
@@ -215,15 +216,15 @@ export default function AdminInventoryPage() {
     {
       key: "user",
       header: "User",
-      render: (e) => <span className="text-muted-foreground">{e.user}</span>,
+      render: (e) => <span className="text-muted-foreground">{e.user?.name ?? ""}</span>,
     },
     {
       key: "date",
       header: "Date",
       sortable: true,
-      sortValue: (e) => e.date,
+      sortValue: (e) => e.createdAt,
       render: (e) => (
-        <span className="whitespace-nowrap text-muted-foreground">{formatDate(e.date)}</span>
+        <span className="whitespace-nowrap text-muted-foreground">{formatDate(e.createdAt)}</span>
       ),
     },
     {
@@ -236,7 +237,7 @@ export default function AdminInventoryPage() {
             type="button"
             onClick={() => openAdjust(e)}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label={`Adjust stock for ${e.productName}`}
+            aria-label={`Adjust stock for ${e.product?.name ?? "product"}`}
           >
             <FiEdit2 className="h-4 w-4" aria-hidden />
           </button>
@@ -244,8 +245,6 @@ export default function AdminInventoryPage() {
       ),
     },
   ];
-
-  const targetCurrent = adjustTarget ? currentStock(adjustTarget) : 0;
 
   return (
     <div className="space-y-6">
@@ -257,14 +256,14 @@ export default function AdminInventoryPage() {
           <ExportButton
             filename="inventory-history"
             data={filtered.map((e) => ({
-              Product: e.productName,
-              SKU: e.sku,
-              Previous: e.previous,
+              Product: e.product?.name ?? "",
+              SKU: e.product?.sku ?? "",
+              Previous: e.previousStock,
               Adjustment: e.adjustment,
-              Current: e.current,
+              Current: e.newStock,
               Reason: e.reason,
-              User: e.user,
-              Date: formatDate(e.date),
+              User: e.user?.name ?? "",
+              Date: formatDate(e.createdAt),
             }))}
             disabled={filtered.length === 0}
           />
@@ -281,7 +280,7 @@ export default function AdminInventoryPage() {
         <StatCard
           icon={<FiBox className="h-5 w-5" aria-hidden />}
           label="Products"
-          value={formatNumber(products.length)}
+          value={formatNumber(allProducts.length)}
           tone="bg-info/10 text-info"
         />
         <StatCard
@@ -325,7 +324,7 @@ export default function AdminInventoryPage() {
       <DataTable<InventoryEntry>
         columns={columns}
         rows={pageItems}
-        rowKey={(e) => e.id}
+        rowKey={(e) => e._id}
         pagination={{
           page,
           totalPages,
@@ -349,7 +348,7 @@ export default function AdminInventoryPage() {
           setForm({ qty: "", reason: "" });
         }}
         title="Adjust stock"
-        subtitle={adjustTarget?.productName}
+        subtitle={adjustTarget?.product?.name}
         size="md"
       >
         {adjustTarget && (
@@ -357,14 +356,14 @@ export default function AdminInventoryPage() {
             <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-4 py-3">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-foreground">
-                  {adjustTarget.productName}
+                  {adjustTarget.product?.name ?? "Unknown"}
                 </p>
-                <p className="font-mono text-xs text-muted-foreground">{adjustTarget.sku}</p>
+                <p className="font-mono text-xs text-muted-foreground">{adjustTarget.product?.sku ?? ""}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Current stock</p>
                 <p className="text-xl font-extrabold text-foreground">
-                  {formatNumber(targetCurrent)}
+                  {formatNumber(adjustTarget.newStock)}
                 </p>
               </div>
             </div>
@@ -398,7 +397,7 @@ export default function AdminInventoryPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={submitAdjustment}>
+              <Button onClick={submitAdjustment} disabled={adjusting}>
                 <FiBox className="h-4 w-4" aria-hidden />
                 Save adjustment
               </Button>

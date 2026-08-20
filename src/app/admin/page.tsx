@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   FiAlertTriangle,
@@ -28,102 +27,81 @@ import {
   LineChart,
   Sparkline,
 } from "@/components/admin/charts";
-import { useAuth } from "@/context/AuthProvider";
-import { readOrders } from "@/lib/orders-store";
-import { sampleOrders } from "@/lib/data/content";
-import { products } from "@/lib/data/products";
-import { activities, notifications } from "@/lib/data/admin";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import {
-  formatPrice,
-  formatNumber,
-  formatDate,
-  timeAgo,
-} from "@/lib/utils";
+  useGetDashboardOverviewQuery,
+  useGetRevenueSeriesQuery,
+  useGetSalesByCategoryQuery,
+  useGetDailyOrdersQuery,
+  useGetTopProductsQuery,
+  useGetLowStockQuery,
+  useGetRecentOrdersQuery,
+  useGetRecentReviewsQuery,
+  useGetOrdersQuery,
+  useGetAdminNotificationsQuery,
+  useGetRecentActivityQuery,
+  useGetRevenueComparisonQuery,
+} from "@/lib/rtk/adminApi";
+import { formatPrice, formatNumber, timeAgo } from "@/lib/utils";
 import type { Order } from "@/lib/types";
+import { useMemo } from "react";
 
-const revenueSeries = [
-  { label: "Jan", value: 32400 },
-  { label: "Feb", value: 41200 },
-  { label: "Mar", value: 38600 },
-  { label: "Apr", value: 45900 },
-  { label: "May", value: 52300 },
-  { label: "Jun", value: 48700 },
-  { label: "Jul", value: 56200 },
-  { label: "Aug", value: 61800 },
+const POLL_INTERVAL = 30000;
+
+const donutColors = [
+  "var(--color-primary)",
+  "var(--color-accent)",
+  "var(--color-info)",
+  "var(--color-success)",
+  "var(--color-warning)",
+  "var(--color-muted-foreground)",
+  "var(--color-primary-strong)",
 ];
-
-const weeklySales = [
-  { name: "This week", color: "var(--color-primary)", points: [
-    { label: "Mon", value: 1420 },
-    { label: "Tue", value: 1780 },
-    { label: "Wed", value: 1610 },
-    { label: "Thu", value: 2140 },
-    { label: "Fri", value: 2380 },
-    { label: "Sat", value: 2910 },
-    { label: "Sun", value: 2450 },
-  ] },
-  { name: "Last week", color: "var(--color-muted-foreground)", points: [
-    { label: "Mon", value: 1180 },
-    { label: "Tue", value: 1350 },
-    { label: "Wed", value: 1490 },
-    { label: "Thu", value: 1600 },
-    { label: "Fri", value: 1820 },
-    { label: "Sat", value: 2210 },
-    { label: "Sun", value: 1980 },
-  ] },
-];
-
-const categorySales = [
-  { label: "Electronics", value: 38, color: "var(--color-primary)" },
-  { label: "Fashion", value: 22, color: "var(--color-accent)" },
-  { label: "Home & Living", value: 17, color: "var(--color-info)" },
-  { label: "Beauty & Care", value: 12, color: "var(--color-success)" },
-  { label: "Sports & Outdoors", value: 7, color: "var(--color-warning)" },
-  { label: "Toys & Kids", value: 4, color: "var(--color-muted-foreground)" },
-];
-
-const dailyOrders = [34, 41, 38, 52, 47, 63, 58];
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
-  const [placedOrders, setPlacedOrders] = useState<Order[]>([]);
+  const { data: user } = useGetMeQuery();
 
-  useEffect(() => {
-    setPlacedOrders(readOrders());
-  }, []);
+  const { data: overview } = useGetDashboardOverviewQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: revenueSeries = [] } = useGetRevenueSeriesQuery(8, { pollingInterval: POLL_INTERVAL });
+  const { data: categorySales = [] } = useGetSalesByCategoryQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: dailyOrders = [] } = useGetDailyOrdersQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: topProducts = [] } = useGetTopProductsQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: lowStock = [] } = useGetLowStockQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: recentOrdersRaw = [] } = useGetRecentOrdersQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: recentReviews = [] } = useGetRecentReviewsQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: allOrdersData } = useGetOrdersQuery({ page: 1, limit: 1 });
+  const { data: notificationsData = [] } = useGetAdminNotificationsQuery();
+  const { data: activityData = [] } = useGetRecentActivityQuery(8, { pollingInterval: POLL_INTERVAL });
+  const { data: comparison } = useGetRevenueComparisonQuery(undefined, { pollingInterval: POLL_INTERVAL });
 
-  const allOrders = useMemo(
-    () => [...placedOrders, ...sampleOrders],
-    [placedOrders]
+  const totalRevenue = overview?.revenue ?? 0;
+  const totalOrders = overview?.orders ?? 0;
+  const totalCustomers = overview?.customers ?? 0;
+  const totalProducts = overview?.products ?? 0;
+
+  const recentOrders: Order[] = useMemo(
+    () =>
+      recentOrdersRaw.map((o) => ({
+        id: String(o._id ?? ""),
+        number: o.number,
+        total: o.total,
+        status: (o.status ?? "pending") as Order["status"],
+        createdAt: o.createdAt,
+        items: [],
+        subtotal: 0,
+        discount: 0,
+        shipping: 0,
+        tax: 0,
+        shippingAddress: {} as Order["shippingAddress"],
+        billingAddress: {} as Order["billingAddress"],
+        paymentMethod: "",
+        deliveryMethod: "",
+        estimatedDelivery: "",
+      })),
+    [recentOrdersRaw]
   );
 
-  const revenue = allOrders
-    .filter((o) => o.status !== "cancelled")
-    .reduce((sum, o) => sum + o.total, 0);
-  const totalRevenue = Math.round(revenue * 40 + 46200);
-
-  const recentOrders = [...allOrders]
-    .sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
-    .slice(0, 6);
-
-  const topProducts = [...products]
-    .sort((a, b) => b.reviewsCount - a.reviewsCount)
-    .slice(0, 5);
-
-  const lowStock = products.filter((p) => p.stock < 10).slice(0, 5);
-
-  const recentReviews = useMemo(() => {
-    const all = products.flatMap((p) =>
-      p.reviews.map((r) => ({ ...r, productName: p.name, productSlug: p.slug }))
-    );
-    return all
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5);
-  }, []);
-
-  const unreadNotifications = notifications.filter((n) => !n.read);
+  const unreadNotifications = notificationsData.filter((n) => !n.read);
 
   const orderColumns: Column<Order>[] = [
     {
@@ -146,14 +124,17 @@ export default function AdminDashboardPage() {
       sortable: true,
       sortValue: (o) => new Date(o.createdAt).getTime(),
       render: (o) => (
-        <span className="text-muted-foreground">{formatDate(o.createdAt)}</span>
+        <span className="text-muted-foreground">{timeAgo(o.createdAt)}</span>
       ),
     },
     {
       key: "customer",
       header: "Customer",
-      render: () => (
-        <span className="text-foreground">{user?.name ?? "NovaMart"}</span>
+      render: (o) => (
+        <span className="text-foreground">
+          {recentOrdersRaw.find((r) => r.number === o.number)?.user?.name ??
+            "NovaMart"}
+        </span>
       ),
     },
     {
@@ -174,6 +155,16 @@ export default function AdminDashboardPage() {
       ),
     },
   ];
+
+  const categorySlices = categorySales.slice(0, 6).map((c, i) => ({
+    label: c.name,
+    value: Math.round((c.value / (categorySales[0]?.value || 1)) * 100),
+    color: donutColors[i % donutColors.length],
+  }));
+
+  const peak = dailyOrders.length > 0 ? Math.max(...dailyOrders.map((d) => d.value)) : 0;
+  const avg = dailyOrders.length > 0 ? dailyOrders.reduce((s, d) => s + d.value, 0) / dailyOrders.length : 0;
+  const today = dailyOrders.length > 0 ? dailyOrders[dailyOrders.length - 1].value : 0;
 
   return (
     <div className="space-y-6">
@@ -198,35 +189,30 @@ export default function AdminDashboardPage() {
         <StatCard
           label="Total revenue"
           value={formatPrice(totalRevenue)}
-          change="+12.4%"
-          up
           icon={<FiDollarSign className="h-5 w-5" aria-hidden />}
           iconClassName="bg-success/10 text-success"
-          changeLabel="vs last month"
+          changeLabel="Live from orders"
         />
         <StatCard
           label="Orders"
-          value={formatNumber(allOrders.length + 1248)}
-          change="+8.1%"
-          up
+          value={formatNumber(totalOrders)}
           icon={<FiShoppingBag className="h-5 w-5" aria-hidden />}
           iconClassName="bg-primary/10 text-primary"
+          changeLabel={`${allOrdersData?.total ?? 0} total`}
         />
         <StatCard
           label="Customers"
-          value="1,284"
-          change="+5.7%"
-          up
+          value={formatNumber(totalCustomers)}
           icon={<FiUsers className="h-5 w-5" aria-hidden />}
           iconClassName="bg-accent/15 text-accent-strong"
+          changeLabel="Registered accounts"
         />
         <StatCard
           label="Products"
-          value={formatNumber(products.length)}
-          change="3 new"
-          up
+          value={formatNumber(totalProducts)}
           icon={<FiBox className="h-5 w-5" aria-hidden />}
           iconClassName="bg-info/10 text-info"
+          changeLabel="Active products"
         />
       </div>
 
@@ -236,10 +222,12 @@ export default function AdminDashboardPage() {
           subtitle="Monthly gross revenue for the last 8 months"
           className="xl:col-span-2"
           action={
-            <Badge variant="success">
-              <FiTrendingUp className="h-3 w-3" aria-hidden />
-              +13.2%
-            </Badge>
+            comparison?.revenue?.change != null ? (
+              <Badge variant={comparison.revenue.change >= 0 ? "success" : "destructive"}>
+                <FiTrendingUp className="h-3 w-3" aria-hidden />
+                {comparison.revenue.change > 0 ? "+" : ""}{comparison.revenue.change}%
+              </Badge>
+            ) : undefined
           }
         >
           <BarChart
@@ -254,7 +242,7 @@ export default function AdminDashboardPage() {
           subtitle="Share of total sales"
         >
           <DonutChart
-            slices={categorySales}
+            slices={categorySlices.length > 0 ? categorySlices : [{ label: "No sales yet", value: 100, color: "var(--color-muted)" }]}
             centerLabel="Total sales"
             formatValue={(v) => `${v}%`}
           />
@@ -264,11 +252,17 @@ export default function AdminDashboardPage() {
       <div className="grid gap-6 xl:grid-cols-3">
         <ChartCard
           title="Weekly sales"
-          subtitle="This week vs last week (daily orders)"
+          subtitle="Orders placed per day"
           className="xl:col-span-2"
         >
           <LineChart
-            series={weeklySales}
+            series={[
+              {
+                name: "Orders",
+                color: "var(--color-primary)",
+                points: dailyOrders.map((d) => ({ label: d.label, value: d.value })),
+              },
+            ]}
             formatValue={(v) => `${formatNumber(v)} orders`}
           />
         </ChartCard>
@@ -276,7 +270,7 @@ export default function AdminDashboardPage() {
         <ChartCard title="Daily orders" subtitle="Orders placed per day">
           <div className="flex items-center gap-6">
             <Sparkline
-              points={dailyOrders}
+              points={dailyOrders.map((d) => d.value)}
               width={120}
               height={64}
               color="var(--color-accent)"
@@ -284,15 +278,15 @@ export default function AdminDashboardPage() {
             <div className="flex-1 space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Today</span>
-                <span className="font-bold text-foreground">58</span>
+                <span className="font-bold text-foreground">{today}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Avg / day</span>
-                <span className="font-bold text-foreground">47.6</span>
+                <span className="font-bold text-foreground">{avg.toFixed(1)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Peak</span>
-                <span className="font-bold text-foreground">63</span>
+                <span className="font-bold text-foreground">{peak}</span>
               </div>
             </div>
           </div>
@@ -329,7 +323,7 @@ export default function AdminDashboardPage() {
             <ul className="divide-y divide-border">
               {topProducts.map((product, i) => (
                 <li
-                  key={product.id}
+                  key={String(product._id ?? product.name)}
                   className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
                 >
                   <span className="w-5 text-sm font-bold text-muted-foreground">
@@ -361,7 +355,7 @@ export default function AdminDashboardPage() {
         <ChartCard title="Recent reviews" subtitle="Latest customer feedback">
           <ul className="divide-y divide-border">
             {recentReviews.map((review) => (
-              <li key={review.id} className="py-3 first:pt-0 last:pb-0">
+              <li key={String(review._id)} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <AdminAvatar name={review.name} size="sm" />
@@ -370,7 +364,7 @@ export default function AdminDashboardPage() {
                         {review.name}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {review.productName}
+                        {review.product?.name ?? "Product"}
                       </p>
                     </div>
                   </div>
@@ -380,47 +374,56 @@ export default function AdminDashboardPage() {
                       {review.rating}
                     </Badge>
                     <span className="hidden text-xs text-muted-foreground sm:block">
-                      {timeAgo(review.date)}
+                      {timeAgo(review.createdAt)}
                     </span>
                   </div>
                 </div>
                 <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
-                  “{review.body}”
+                  "{review.body}"
                 </p>
               </li>
             ))}
           </ul>
         </ChartCard>
 
-        <ChartCard title="Recent activity" subtitle="Admin & system actions">
+        <ChartCard title="Recent activity" subtitle="Real-time admin & system actions">
           <ul className="divide-y divide-border">
-            {activities.slice(0, 6).map((activity) => (
-              <li key={activity.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                <span
-                  className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                    activity.type === "delete"
-                      ? "bg-destructive/10 text-destructive"
-                      : activity.type === "status"
-                        ? "bg-info/10 text-info"
-                        : activity.type === "login"
-                          ? "bg-warning/15 text-warning"
-                          : "bg-success/10 text-success"
-                  }`}
-                >
-                  {activity.actor.charAt(0)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-foreground">
-                    <span className="font-semibold">{activity.actor}</span>{" "}
-                    {activity.action}{" "}
-                    <span className="font-medium text-primary">
-                      {activity.target}
+            {activityData.length === 0 ? (
+              <li className="py-4 text-center text-sm text-muted-foreground">No recent activity</li>
+            ) : (
+              activityData.slice(0, 6).map((activity) => {
+                const levelType = activity.level === "error" ? "delete" : activity.level === "success" ? "create" : activity.details === "create" ? "create" : activity.details === "shipped" || activity.details === "pending" ? "status" : "update";
+                return (
+                  <li key={activity._id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <span
+                      className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                        levelType === "delete"
+                          ? "bg-destructive/10 text-destructive"
+                          : levelType === "status"
+                            ? "bg-info/10 text-info"
+                            : "bg-success/10 text-success"
+                      }`}
+                    >
+                      {activity.user?.charAt(0) ?? "S"}
                     </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
-                </div>
-              </li>
-            ))}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-foreground">
+                        <span className="font-semibold">{activity.user}</span>{" "}
+                        {activity.action}
+                        {activity.details && (
+                          <>{" "}
+                            <span className="font-medium text-primary">
+                              {activity.details}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{timeAgo(activity.createdAt)}</p>
+                    </div>
+                  </li>
+                );
+              })
+            )}
           </ul>
         </ChartCard>
 
@@ -434,9 +437,9 @@ export default function AdminDashboardPage() {
             }
           >
             <ul className="space-y-2.5">
-              {notifications.slice(0, 4).map((n) => (
+              {notificationsData.slice(0, 4).map((n) => (
                 <li
-                  key={n.id}
+                  key={n._id}
                   className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3"
                 >
                   <span
@@ -462,7 +465,7 @@ export default function AdminDashboardPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">{n.message}</p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground/70">
-                      {n.time}
+                      {timeAgo(n.createdAt)}
                     </p>
                   </div>
                   {!n.read && (
@@ -492,7 +495,7 @@ export default function AdminDashboardPage() {
               <ul className="divide-y divide-border">
                 {lowStock.map((product) => (
                   <li
-                    key={product.id}
+                    key={String(product._id ?? product.name)}
                     className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
                   >
                     <p className="truncate text-sm font-medium text-foreground">
@@ -516,7 +519,7 @@ export default function AdminDashboardPage() {
             </span>
             <div>
               <p className="text-sm font-semibold text-foreground">
-                3 vendors awaiting approval
+                {overview?.pendingVendors ?? 0} vendors awaiting approval
               </p>
               <p className="text-xs text-muted-foreground">
                 Review pending applications in the vendors section.

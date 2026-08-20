@@ -19,18 +19,19 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { useToast } from "@/context/ToastProvider";
-import { notifications } from "@/lib/data/admin";
-import type {
-  AdminNotification,
-  NotificationType,
-} from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminNotificationsQuery,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
+  useDeleteNotificationMutation,
+  type AdminNotification,
+} from "@/lib/rtk/adminApi";
 import { cn } from "@/lib/utils";
 
-const typeStyles: Record<
-  NotificationType,
-  { icon: ReactNode; className: string }
-> = {
+type NotificationType = AdminNotification["type"];
+
+const typeStyles: Record<string, { icon: ReactNode; className: string }> = {
   order: {
     icon: <FiShoppingBag className="h-5 w-5" aria-hidden />,
     className: "bg-primary/10 text-primary",
@@ -54,12 +55,16 @@ const typeStyles: Record<
 };
 
 export default function AdminNotificationsPage() {
-  const { success, info } = useToast();
-  const [items, setItems] = useState<AdminNotification[]>(notifications);
   const [typeFilter, setTypeFilter] = useState("all");
   const [query, setQuery] = useState("");
-  const [deleteTarget, setDeleteTarget] =
-    useState<AdminNotification | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminNotification | null>(null);
+
+  const { data: notificationsData, isLoading } = useGetAdminNotificationsQuery();
+  const [markRead] = useMarkNotificationReadMutation();
+  const [markAllRead] = useMarkAllNotificationsReadMutation();
+  const [deleteNotification] = useDeleteNotificationMutation();
+
+  const items = useMemo(() => notificationsData ?? [], [notificationsData]);
 
   const unreadCount = useMemo(
     () => items.filter((n) => !n.read).length,
@@ -78,26 +83,37 @@ export default function AdminNotificationsPage() {
     });
   }, [items, typeFilter, query]);
 
-  const markAllRead = () => {
+  const handleMarkAllRead = async () => {
     if (unreadCount === 0) return;
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-    success("All read", "All notifications were marked as read.");
+    try {
+      await markAllRead().unwrap();
+      toast.success("All read", "All notifications were marked as read.");
+    } catch {
+      toast.error("Failed", "Could not mark all notifications as read.");
+    }
   };
 
-  const toggleRead = (n: AdminNotification) => {
-    const updated = { ...n, read: !n.read };
-    setItems((prev) => prev.map((item) => (item.id === n.id ? updated : item)));
-    info(
-      updated.read ? "Marked as read" : "Marked as unread",
-      `“${n.title}”`
-    );
+  const toggleRead = async (n: AdminNotification) => {
+    try {
+      await markRead(n._id).unwrap();
+      toast.info(
+        n.read ? "Marked as unread" : "Marked as read",
+        `"${n.title}"`
+      );
+    } catch {
+      toast.error("Failed", "Could not update notification.");
+    }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((n) => n.id !== deleteTarget.id));
-    success("Notification removed", `“${deleteTarget.title}” was deleted.`);
-    setDeleteTarget(null);
+    try {
+      await deleteNotification(deleteTarget._id).unwrap();
+      toast.success("Notification removed", `"${deleteTarget.title}" was deleted.`);
+      setDeleteTarget(null);
+    } catch {
+      toast.error("Failed", "Could not delete notification.");
+    }
   };
 
   return (
@@ -114,7 +130,7 @@ export default function AdminNotificationsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={markAllRead}
+              onClick={handleMarkAllRead}
               disabled={unreadCount === 0}
             >
               <FiCheck className="h-4 w-4" aria-hidden />
@@ -154,9 +170,9 @@ export default function AdminNotificationsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((n) => {
-            const style = typeStyles[n.type];
+            const style = typeStyles[n.type] ?? typeStyles.system;
             return (
-              <Card key={n.id} className="p-4">
+              <Card key={n._id} className="p-4">
                 <div className="flex items-start gap-3">
                   <span
                     className={cn(
@@ -180,7 +196,7 @@ export default function AdminNotificationsPage() {
                         </p>
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {n.time}
+                        {formatDate(n.createdAt)}
                       </span>
                     </div>
                     <p className="mt-0.5 text-sm text-muted-foreground">
@@ -227,9 +243,21 @@ export default function AdminNotificationsPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={remove}
         title="Delete notification?"
-        description={`This will permanently remove “${deleteTarget?.title}”. This action cannot be undone.`}
+        description={`This will permanently remove "${deleteTarget?.title}". This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>
   );
+}
+
+function formatDate(date: string) {
+  try {
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return date;
+  }
 }

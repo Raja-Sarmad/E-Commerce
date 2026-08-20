@@ -6,20 +6,35 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import { AdminFooter } from "@/components/admin/AdminFooter";
 import { Container } from "@/components/ui/Container";
-import { useAuth } from "@/context/AuthProvider";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { cn } from "@/lib/utils";
 
+const ADMIN_ROLES = ["admin", "super_admin", "manager", "staff"];
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  const { isAdmin } = useAuth();
+  const { data: user, isLoading } = useGetMeQuery();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin) router.replace("/login");
-  }, [isAdmin, router]);
+    if (isLoading) return;
+    if (!user) {
+      router.replace("/login");
+    } else if (!ADMIN_ROLES.includes(user.role ?? "")) {
+      router.replace("/account/profile");
+    }
+  }, [user, isLoading, router]);
 
-  if (!isAdmin) {
+  if (isLoading) {
+    return (
+      <Container className="py-20 text-center text-muted-foreground">
+        Verifying admin access...
+      </Container>
+    );
+  }
+
+  if (!user || !ADMIN_ROLES.includes(user.role ?? "")) {
     return (
       <Container className="py-20 text-center text-muted-foreground">
         Verifying admin access...

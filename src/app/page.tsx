@@ -13,19 +13,32 @@ import {
   getFlashSaleProducts,
   getTrendingProducts,
   getRecommendedProducts,
-} from "@/lib/data";
+} from "@/lib/api/server";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Premium Shopping, Delivered",
 };
 
-export default function HomePage() {
-  const featured = getFeaturedProducts();
-  const bestSellers = getBestSellers();
-  const newArrivals = getNewArrivals();
-  const flash = getFlashSaleProducts();
-  const trending = getTrendingProducts();
-  const recommended = getRecommendedProducts();
+async function safeFetch<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch {
+    return [] as unknown as T;
+  }
+}
+
+export default async function HomePage() {
+  const [featured, bestSellers, newArrivals, flash, trending, recommended] =
+    await Promise.all([
+      safeFetch(getFeaturedProducts),
+      safeFetch(getBestSellers),
+      safeFetch(getNewArrivals),
+      safeFetch(getFlashSaleProducts),
+      safeFetch(getTrendingProducts),
+      safeFetch(getRecommendedProducts),
+    ]);
 
   return (
     <div className="overflow-hidden">

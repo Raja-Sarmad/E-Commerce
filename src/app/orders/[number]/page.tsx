@@ -10,8 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { ProductImage } from "@/components/ui/ProductImage";
-import { readOrders } from "@/lib/orders-store";
-import { sampleOrders } from "@/lib/data/content";
+import { useGetMeQuery, useGetMyOrdersQuery } from "@/lib/rtk/authApi";
 import type { Order, OrderStatus } from "@/lib/types";
 import { formatPrice, formatDate, formatDateLong, cn } from "@/lib/utils";
 
@@ -25,18 +24,15 @@ const statusVariant: Record<OrderStatus, "warning" | "info" | "success" | "destr
 
 export default function OrderDetailsPage() {
   const params = useParams<{ number: string }>();
-  const [order, setOrder] = useState<Order | undefined>();
-  const [loaded, setLoaded] = useState(false);
+  const { data: user } = useGetMeQuery();
+  const isAuthenticated = Boolean(user);
+  const { data: orders = [], isLoading } = useGetMyOrdersQuery(undefined, {
+    skip: !isAuthenticated,
+  });
 
-  useEffect(() => {
-    const number = params.number;
-    const fromStore = readOrders().find((o) => o.number === number);
-    const fromSamples = sampleOrders.find((o) => o.number === number);
-    setOrder(fromStore ?? fromSamples);
-    setLoaded(true);
-  }, [params.number]);
+  const order = orders.find((o) => o.number === params.number);
 
-  if (!loaded) {
+  if (isLoading || !isAuthenticated) {
     return (
       <Container className="py-20 text-center text-muted-foreground">
         Loading order...

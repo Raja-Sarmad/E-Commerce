@@ -18,9 +18,15 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { StatCard } from "@/components/admin/StatCard";
-import { useToast } from "@/context/ToastProvider";
-import { roles, type Role } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  useGetAdminRolesQuery,
+  useCreateRoleMutation,
+  useUpdateRoleMutation,
+  useDeleteRoleMutation,
+} from "@/lib/rtk/adminApi";
+import type { AdminRole } from "@/lib/rtk/adminApi";
 
 const modules = ["Dashboard", "Products", "Orders", "Customers", "Reviews", "Coupons", "Inventory", "Blog", "Reports", "Settings"];
 const perms = ["view", "create", "update", "delete"];
@@ -36,17 +42,22 @@ const colorMap: Record<string, string> = {
 const emptyPermissions = Object.fromEntries(modules.map((m) => [m, ["view"]]));
 
 export default function AdminRolesPage() {
-  const { toast, success, error } = useToast();
-  const [rolesList, setRolesList] = useState<Role[]>(roles);
-  const [editing, setEditing] = useState<Role | null>(null);
+  const { data: rolesData, isLoading } = useGetAdminRolesQuery();
+  const [createRoleApi] = useCreateRoleMutation();
+  const [updateRoleApi] = useUpdateRoleMutation();
+  const [deleteRoleApi] = useDeleteRoleMutation();
+
+  const rolesList = rolesData?.items ?? [];
+
+  const [editing, setEditing] = useState<AdminRole | null>(null);
   const [matrix, setMatrix] = useState<Record<string, string[]>>(emptyPermissions);
-  const [deleting, setDeleting] = useState<Role | null>(null);
+  const [deleting, setDeleting] = useState<AdminRole | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [draft, setDraft] = useState({ name: "", description: "" });
 
   const totalMembers = rolesList.reduce((sum, r) => sum + r.members, 0);
 
-  const openMatrix = (role: Role) => {
+  const openMatrix = (role: AdminRole) => {
     setEditing(role);
     setMatrix(JSON.parse(JSON.stringify(role.permissions)));
   };
@@ -61,42 +72,56 @@ export default function AdminRolesPage() {
     });
   };
 
-  const saveMatrix = () => {
+  const saveMatrix = async () => {
     if (!editing) return;
-    setRolesList((prev) =>
-      prev.map((r) =>
-        r.id === editing.id ? { ...r, permissions: matrix } : r
-      )
-    );
-    success("Permissions updated", `${editing.name} permissions have been saved.`);
-    setEditing(null);
+    try {
+      await updateRoleApi({ id: editing._id, body: { permissions: matrix } }).unwrap();
+      toast.success("Permissions updated", `${editing.name} permissions have been saved.`);
+      setEditing(null);
+    } catch {
+      toast.error("Update failed", "Could not save permissions.");
+    }
   };
 
-  const createRole = () => {
+  const createRole = async () => {
     if (!draft.name.trim()) {
-      error("Name required", "Enter a role name to continue.");
+      toast.error("Name required", "Enter a role name to continue.");
       return;
     }
-    const role: Role = {
-      id: `rl-${String(Date.now())}`,
-      name: draft.name.trim(),
-      description: draft.description.trim() || "Custom role with default view access.",
-      members: 0,
-      color: "info",
-      permissions: JSON.parse(JSON.stringify(emptyPermissions)),
-    };
-    setRolesList((prev) => [...prev, role]);
-    success("Role created", `${role.name} has been added.`);
-    setDraft({ name: "", description: "" });
-    setCreateOpen(false);
+    try {
+      await createRoleApi({
+        name: draft.name.trim(),
+        description: draft.description.trim() || "Custom role with default view access.",
+        members: 0,
+        color: "info",
+        permissions: JSON.parse(JSON.stringify(emptyPermissions)),
+      }).unwrap();
+      toast.success("Role created", `${draft.name.trim()} has been added.`);
+      setDraft({ name: "", description: "" });
+      setCreateOpen(false);
+    } catch {
+      toast.error("Create failed", "Could not create role.");
+    }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleting) return;
-    setRolesList((prev) => prev.filter((r) => r.id !== deleting.id));
-    toast("info", "Role deleted", `${deleting.name} has been removed.`);
-    setDeleting(null);
+    try {
+      await deleteRoleApi(deleting._id).unwrap();
+      toast.info("Role deleted", `${deleting.name} has been removed.`);
+      setDeleting(null);
+    } catch {
+      toast.error("Delete failed", "Could not delete role.");
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading roles…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -152,7 +177,7 @@ export default function AdminRolesPage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {rolesList.map((role) => (
-          <Card key={role.id} className="flex flex-col p-5">
+          <Card key={role._id} className="flex flex-col p-5">
             <div className="flex items-start justify-between gap-3">
               <span
                 className={cn(

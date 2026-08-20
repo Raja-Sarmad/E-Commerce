@@ -12,21 +12,31 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { ExportButton } from "@/components/admin/ExportButton";
-import { useToast } from "@/context/ToastProvider";
-import { contactMessages, type ContactMessage } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminMessagesQuery,
+  useUpdateMessageMutation,
+  useDeleteMessageMutation,
+  type AdminMessage,
+} from "@/lib/rtk/adminApi";
+import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { formatDateLong, timeAgo } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export default function AdminMessagesPage() {
-  const { success, info, warning } = useToast();
-  const [items, setItems] = useState<ContactMessage[]>(contactMessages);
+  const { data } = useGetAdminMessagesQuery({});
+  const [updateMessage] = useUpdateMessageMutation();
+  const [deleteMessage] = useDeleteMessageMutation();
+
+  const items: AdminMessage[] = data?.items ?? [];
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
 
-  const selected = items.find((m) => m.id === selectedId) ?? null;
+  const selected = items.find((m) => m._id === selectedId) ?? null;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -40,45 +50,50 @@ export default function AdminMessagesPage() {
     });
   }, [items, query, statusFilter]);
 
-  const toggleRead = (message: ContactMessage) => {
-    const updated: ContactMessage = {
-      ...message,
-      status: message.status === "read" ? "unread" : "read",
-    };
-    setItems((prev) => prev.map((m) => (m.id === message.id ? updated : m)));
-    info(
-      updated.status === "read" ? "Marked as read" : "Marked as unread",
-      `Message from ${message.name}.`
-    );
+  const toggleRead = async (message: AdminMessage) => {
+    const newStatus = message.status === "read" ? "unread" : "read";
+    try {
+      await updateMessage({ id: message._id, body: { status: newStatus } }).unwrap();
+      toast.info(
+        newStatus === "read" ? "Marked as read" : "Marked as unread",
+        `Message from ${message.name}.`
+      );
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
+    }
   };
 
-  const toggleStar = (message: ContactMessage) => {
-    const updated = { ...message, starred: !message.starred };
-    setItems((prev) => prev.map((m) => (m.id === message.id ? updated : m)));
-    info(
-      updated.starred ? "Starred" : "Unstarred",
-      `Message from ${message.name}.`
-    );
+  const toggleStar = async (message: AdminMessage) => {
+    try {
+      await updateMessage({ id: message._id, body: { starred: !message.starred } }).unwrap();
+      toast.info(
+        !message.starred ? "Starred" : "Unstarred",
+        `Message from ${message.name}.`
+      );
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
+    }
   };
 
-  const toggleArchive = (message: ContactMessage) => {
-    const updated: ContactMessage = {
-      ...message,
-      status: message.status === "archived" ? "read" : "archived",
-    };
-    setItems((prev) => prev.map((m) => (m.id === message.id ? updated : m)));
-    info(
-      updated.status === "archived" ? "Archived" : "Unarchived",
-      `Message from ${message.name}.`
-    );
+  const toggleArchive = async (message: AdminMessage) => {
+    const newStatus = message.status === "archived" ? "read" : "archived";
+    try {
+      await updateMessage({ id: message._id, body: { status: newStatus } }).unwrap();
+      toast.info(
+        newStatus === "archived" ? "Archived" : "Unarchived",
+        `Message from ${message.name}.`
+      );
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
+    }
   };
 
   const sendReply = () => {
     if (!replyText.trim()) {
-      warning("Empty reply", "Write a message before sending.");
+      toast.warning("Empty reply", "Write a message before sending.");
       return;
     }
-    success("Reply sent", `Your reply to ${selected?.email} has been queued.`);
+    toast.success("Reply sent", `Your reply to ${selected?.email} has been queued.`);
     setReplyText("");
     setReplyOpen(false);
   };
@@ -97,7 +112,7 @@ export default function AdminMessagesPage() {
               Email: m.email,
               Subject: m.subject,
               Message: m.message,
-              Date: m.date,
+              Date: m.createdAt,
               Status: m.status,
               Starred: m.starred ? "Yes" : "No",
             }))}
@@ -138,16 +153,16 @@ export default function AdminMessagesPage() {
             ) : (
               filtered.map((message) => (
                 <div
-                  key={message.id}
+                  key={message._id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => setSelectedId(message.id)}
+                  onClick={() => setSelectedId(message._id)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setSelectedId(message.id);
+                    if (e.key === "Enter" || e.key === " ") setSelectedId(message._id);
                   }}
                   className={cn(
                     "flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/40",
-                    selectedId === message.id && "bg-primary/5"
+                    selectedId === message._id && "bg-primary/5"
                   )}
                 >
                   <AdminAvatar name={message.name} size="sm" />
@@ -162,7 +177,7 @@ export default function AdminMessagesPage() {
                         {message.name}
                       </p>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {timeAgo(message.date)}
+                        {timeAgo(message.createdAt)}
                       </span>
                     </div>
                     <p className="truncate text-sm text-muted-foreground">{message.subject}</p>
@@ -226,7 +241,7 @@ export default function AdminMessagesPage() {
                 </p>
               </div>
               <span className="ml-auto text-xs text-muted-foreground">
-                {formatDateLong(selected.date)}
+                {formatDateLong(selected.createdAt)}
               </span>
             </div>
 

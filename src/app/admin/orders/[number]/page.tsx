@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -22,34 +22,90 @@ import { Modal } from "@/components/ui/Modal";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useToast } from "@/context/ToastProvider";
-import { readOrders } from "@/lib/orders-store";
-import { sampleOrders } from "@/lib/data/content";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetOrderDetailQuery,
+  useUpdateOrderStatusMutation,
+  useAddOrderTrackingMutation,
+} from "@/lib/rtk/adminApi";
 import { formatPrice, formatDate, formatDateLong, cn } from "@/lib/utils";
-import type { Order, OrderStatus } from "@/lib/types";
 
-const statusSteps: OrderStatus[] = ["pending", "processing", "shipped", "delivered"];
+const statusSteps = ["pending", "processing", "shipped", "delivered"];
+
+type OrderData = {
+  _id: string;
+  number: string;
+  status: string;
+  items: Array<{
+    productId: string;
+    name: string;
+    image: string;
+    price: number;
+    quantity: number;
+    color?: string;
+    size?: string;
+  }>;
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  tax: number;
+  total: number;
+  couponCode?: string;
+  shippingAddress: {
+    firstName?: string;
+    lastName?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+    phone?: string;
+  };
+  billingAddress: {
+    firstName?: string;
+    lastName?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+    phone?: string;
+  };
+  paymentMethod: string;
+  payment?: { status: string; method: string };
+  estimatedDelivery?: string;
+  deliveredAt?: string;
+  cancelledAt?: string;
+  cancelReason?: string;
+  tracking?: {
+    carrier: string;
+    trackingNumber: string;
+    events: Array<{ date: string; label: string; location: string }>;
+  };
+  timeline?: Array<{ status: string; date: string; note: string }>;
+  user?: { name: string; email: string };
+  createdAt: string;
+};
 
 export default function AdminOrderDetailPage() {
   const params = useParams<{ number: string }>();
   const router = useRouter();
-  const { success, info } = useToast();
-  const [order, setOrder] = useState<Order | undefined>();
-  const [loaded, setLoaded] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
 
-  useEffect(() => {
-    const number = params.number;
-    const fromStore = readOrders().find((o) => o.number === number);
-    const fromSamples = sampleOrders.find((o) => o.number === number);
-    setOrder(fromStore ?? fromSamples);
-    setLoaded(true);
-  }, [params.number]);
+  const { data: orderData, isLoading, error } = useGetOrderDetailQuery(params.number);
+  const [updateStatus] = useUpdateOrderStatusMutation();
+  const [addTracking] = useAddOrderTrackingMutation();
 
-  const changeStatus = (next: OrderStatus) => {
+  const order = orderData as OrderData | undefined;
+
+  const changeStatus = async (next: string) => {
     if (!order) return;
-    setOrder({ ...order, status: next });
-    info("Status updated", `Order #${order.number} is now ${next}.`);
+    try {
+      await updateStatus({ id: order._id, status: next }).unwrap();
+      toast.info("Status updated", `Order #${order.number} is now ${next}.`);
+    } catch {
+      toast.error("Failed", "Could not update order status.");
+    }
   };
 
   const printInvoice = () => {
@@ -61,10 +117,10 @@ export default function AdminOrderDetailPage() {
     window.print();
     document.body.innerHTML = original;
     setInvoiceOpen(false);
-    success("Invoice printed", `Invoice for order #${order.number} sent to printer.`);
+    toast.success("Invoice printed", `Invoice for order #${order.number} sent to printer.`);
   };
 
-  if (!loaded) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <AdminPageHeader title="Order details" subtitle="Loading order..." />
@@ -72,7 +128,7 @@ export default function AdminOrderDetailPage() {
     );
   }
 
-  if (!order) {
+  if (error || !order) {
     return (
       <div className="space-y-6">
         <AdminPageHeader
@@ -94,7 +150,7 @@ export default function AdminOrderDetailPage() {
     order.status === "cancelled" ? "pending" : order.status
   );
   const itemCount = order.items.reduce((sum, i) => sum + i.quantity, 0);
-  const customerName = `${order.shippingAddress.firstName} ${order.shippingAddress.lastName}`;
+  const customerName = `${order.shippingAddress.firstName ?? ""} ${order.shippingAddress.lastName ?? ""}`.trim() || order.user?.name || "Customer";
 
   return (
     <div className="space-y-6">
@@ -140,7 +196,7 @@ export default function AdminOrderDetailPage() {
               <div className="flex items-center gap-2">
                 <Select
                   value={order.status}
-                  onChange={(e) => changeStatus(e.target.value as OrderStatus)}
+                  onChange={(e) => changeStatus(e.target.value)}
                   containerClassName="w-44"
                   className="h-9 px-3 text-sm"
                   aria-label="Change order status"
@@ -290,7 +346,7 @@ export default function AdminOrderDetailPage() {
             </div>
           </Card>
 
-          {order.tracking && (
+          {order.tracking && order.tracking.trackingNumber && (
             <Card className="overflow-hidden">
               <div className="flex items-center gap-2 border-b border-border px-5 py-4">
                 <FiTruck className="h-4 w-4 text-primary" aria-hidden />
@@ -303,31 +359,33 @@ export default function AdminOrderDetailPage() {
                 <p className="font-mono text-sm text-muted-foreground">
                   Tracking # {order.tracking.trackingNumber}
                 </p>
-                <ol className="mt-4 space-y-4">
-                  {order.tracking.events.map((event, i) => (
-                    <li key={i} className="relative flex gap-4 pb-1">
-                      {i < order.tracking!.events.length - 1 && (
-                        <span className="absolute left-[9px] top-5 h-full w-px bg-border" aria-hidden />
-                      )}
-                      <span
-                        className={cn(
-                          "relative z-10 mt-1 h-[18px] w-[18px] shrink-0 rounded-full border-2",
-                          i === 0
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-card"
+                {order.tracking.events.length > 0 && (
+                  <ol className="mt-4 space-y-4">
+                    {order.tracking.events.map((event, i) => (
+                      <li key={i} className="relative flex gap-4 pb-1">
+                        {i < order.tracking!.events.length - 1 && (
+                          <span className="absolute left-[9px] top-5 h-full w-px bg-border" aria-hidden />
                         )}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">
-                          {event.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {event.location} · {formatDate(event.date)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                        <span
+                          className={cn(
+                            "relative z-10 mt-1 h-[18px] w-[18px] shrink-0 rounded-full border-2",
+                            i === 0
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-card"
+                          )}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            {event.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {event.location} · {formatDate(event.date)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </div>
             </Card>
           )}
@@ -352,15 +410,17 @@ export default function AdminOrderDetailPage() {
             </address>
             <div className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Delivery</span>
-                <span className="font-medium text-foreground">{order.deliveryMethod}</span>
+                <span className="text-muted-foreground">Payment</span>
+                <span className="font-medium text-foreground">{order.paymentMethod}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ETA</span>
-                <span className="font-medium text-foreground">
-                  {formatDate(order.estimatedDelivery)}
-                </span>
-              </div>
+              {order.estimatedDelivery && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">ETA</span>
+                  <span className="font-medium text-foreground">
+                    {formatDate(order.estimatedDelivery)}
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
 
@@ -390,6 +450,28 @@ export default function AdminOrderDetailPage() {
               </address>
             </div>
           </Card>
+
+          {order.timeline && order.timeline.length > 0 && (
+            <Card className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <FiTruck className="h-4 w-4 text-primary" aria-hidden />
+                <h2 className="font-bold text-foreground">Timeline</h2>
+              </div>
+              <ol className="space-y-3">
+                {order.timeline.map((event, i) => (
+                  <li key={i} className="flex gap-3 text-sm">
+                    <StatusBadge status={event.status} className="shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground">{formatDate(event.date)}</p>
+                      {event.note && (
+                        <p className="mt-0.5 text-xs text-muted-foreground/70">{event.note}</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
         </div>
       </div>
 

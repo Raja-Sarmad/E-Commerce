@@ -1,38 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FiEye, FiMessageSquare, FiStar, FiTrash2 } from "react-icons/fi";
+import { FiEye, FiMessageSquare, FiStar } from "react-icons/fi";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
-import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
-import { useToast } from "@/context/ToastProvider";
-import { products } from "@/lib/data/products";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminReviewsQuery,
+  useModerateReviewMutation,
+  type AdminReview,
+} from "@/lib/rtk/adminApi";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
-import type { Review } from "@/lib/types";
 
 const PER_PAGE = 10;
-
-type FlatReview = Review & {
-  productName: string;
-  productSlug: string;
-  status: "approved" | "hidden";
-};
-
-const allReviews: FlatReview[] = products.flatMap((p) =>
-  p.reviews.map((r) => ({
-    ...r,
-    productName: p.name,
-    productSlug: p.slug,
-    status: "approved" as const,
-  }))
-);
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -52,24 +39,26 @@ function Stars({ rating }: { rating: number }) {
 }
 
 export default function AdminReviewsPage() {
-  const { success, info } = useToast();
-  const [reviews, setReviews] = useState<FlatReview[]>(allReviews);
   const [query, setQuery] = useState("");
   const [rating, setRating] = useState("all");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
-  const [detailsTarget, setDetailsTarget] = useState<FlatReview | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<FlatReview | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<AdminReview | null>(null);
+
+  const { data, isLoading } = useGetAdminReviewsQuery({});
+  const [moderateReview] = useModerateReviewMutation();
+
+  const items = useMemo(() => data?.items ?? [], [data]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return reviews.filter((r) => {
+    return items.filter((r) => {
       const matchesQuery =
         !q ||
-        r.name.toLowerCase().includes(q) ||
+        (r.user?.name ?? r.name ?? "").toLowerCase().includes(q) ||
         r.title.toLowerCase().includes(q) ||
-        r.productName.toLowerCase().includes(q) ||
+        (r.product?.name ?? "").toLowerCase().includes(q) ||
         r.body.toLowerCase().includes(q);
       const matchesRating =
         rating === "all" ||
@@ -79,38 +68,24 @@ export default function AdminReviewsPage() {
       const matchesStatus = status === "all" || r.status === status;
       return matchesQuery && matchesRating && matchesStatus;
     });
-  }, [reviews, query, rating, status]);
+  }, [items, query, rating, status]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const toggleStatus = (review: FlatReview) => {
-    const updated = {
-      ...review,
-      status: (review.status === "approved" ? "hidden" : "approved") as
-        | "approved"
-        | "hidden",
-    };
-    setReviews((prev) =>
-      prev.map((r) => (r.id === review.id ? updated : r))
-    );
-    info(
-      updated.status === "approved" ? "Approved" : "Hidden",
-      updated.status === "approved"
-        ? `Review by “${review.name}” is now visible.`
-        : `Review by “${review.name}” is hidden from the store.`
-    );
-  };
-
-  const remove = () => {
-    if (!deleteTarget) return;
-    setReviews((prev) =>
-      prev.filter(
-        (r) => !(r.id === deleteTarget.id && r.productSlug === deleteTarget.productSlug)
-      )
-    );
-    success("Review removed", `Review by “${deleteTarget.name}” was deleted.`);
-    setDeleteTarget(null);
+  const toggleStatus = async (review: AdminReview) => {
+    const nextStatus = review.status === "approved" ? "hidden" : "approved";
+    try {
+      await moderateReview({ id: review._id, status: nextStatus }).unwrap();
+      toast.success(
+        nextStatus === "approved" ? "Approved" : "Hidden",
+        nextStatus === "approved"
+          ? `Review by "${review.user?.name ?? review.name}" is now visible.`
+          : `Review by "${review.user?.name ?? review.name}" is hidden from the store.`
+      );
+    } catch {
+      toast.error("Error", "Failed to update review status.");
+    }
   };
 
   const handlePageSize = (size: number) => {
@@ -118,15 +93,15 @@ export default function AdminReviewsPage() {
     setPage(1);
   };
 
-  const columns: Column<FlatReview>[] = [
+  const columns: Column<AdminReview>[] = [
     {
       key: "product",
       header: "Product",
       sortable: true,
-      sortValue: (r) => r.productName,
+      sortValue: (r) => r.product?.name ?? "",
       render: (r) => (
         <p className="max-w-[200px] truncate text-sm font-medium text-foreground">
-          {r.productName}
+          {r.product?.name ?? "—"}
         </p>
       ),
     },
@@ -134,12 +109,12 @@ export default function AdminReviewsPage() {
       key: "customer",
       header: "Customer",
       sortable: true,
-      sortValue: (r) => r.name,
+      sortValue: (r) => r.user?.name ?? r.name ?? "",
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <AdminAvatar name={r.name} size="xs" />
+          <AdminAvatar name={r.user?.name ?? r.name ?? "Unknown"} size="xs" />
           <span className="whitespace-nowrap font-medium text-foreground">
-            {r.name}
+            {r.user?.name ?? r.name ?? "Unknown"}
           </span>
         </div>
       ),
@@ -176,11 +151,11 @@ export default function AdminReviewsPage() {
       key: "date",
       header: "Date",
       sortable: true,
-      sortValue: (r) => r.date,
+      sortValue: (r) => r.createdAt,
       render: (r) => (
         <div className="whitespace-nowrap">
-          <p className="text-sm text-foreground">{formatDate(r.date)}</p>
-          <p className="text-xs text-muted-foreground">{timeAgo(r.date)}</p>
+          <p className="text-sm text-foreground">{formatDate(r.createdAt)}</p>
+          <p className="text-xs text-muted-foreground">{timeAgo(r.createdAt)}</p>
         </div>
       ),
     },
@@ -230,17 +205,9 @@ export default function AdminReviewsPage() {
             type="button"
             onClick={() => setDetailsTarget(r)}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label={`View review by ${r.name}`}
+            aria-label={`View review by ${r.user?.name ?? r.name ?? "customer"}`}
           >
             <FiEye className="h-4 w-4" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={() => setDeleteTarget(r)}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-            aria-label={`Delete review by ${r.name}`}
-          >
-            <FiTrash2 className="h-4 w-4" aria-hidden />
           </button>
         </div>
       ),
@@ -251,18 +218,18 @@ export default function AdminReviewsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Reviews"
-        subtitle={`Moderate customer feedback — ${reviews.length} reviews total.`}
+        subtitle={`Moderate customer feedback — ${data?.total ?? items.length} reviews total.`}
         breadcrumb={[{ label: "Reviews" }]}
         actions={
           <ExportButton
             filename="reviews"
             data={filtered.map((r) => ({
-              Product: r.productName,
-              Customer: r.name,
+              Product: r.product?.name ?? "",
+              Customer: r.user?.name ?? r.name ?? "",
               Rating: r.rating,
               Title: r.title,
               Body: r.body,
-              Date: formatDate(r.date),
+              Date: formatDate(r.createdAt),
               Verified: r.verified ? "Yes" : "No",
               Status: r.status,
               Helpful: r.helpful,
@@ -312,38 +279,44 @@ export default function AdminReviewsPage() {
         }
       />
 
-      <DataTable<FlatReview>
-        columns={columns}
-        rows={pageItems}
-        rowKey={(r) => `${r.productSlug}-${r.id}`}
-        pagination={{
-          page,
-          totalPages,
-          totalItems: filtered.length,
-          pageSize,
-          onPageChange: setPage,
-          onPageSizeChange: handlePageSize,
-          pageSizeOptions: [10, 20, 50],
-        }}
-        empty={{
-          icon: <FiMessageSquare className="h-7 w-7" aria-hidden />,
-          title: "No reviews found",
-          description: "Try adjusting your search or filters.",
-        }}
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-muted-foreground">
+          Loading reviews…
+        </div>
+      ) : (
+        <DataTable<AdminReview>
+          columns={columns}
+          rows={pageItems}
+          rowKey={(r) => r._id}
+          pagination={{
+            page,
+            totalPages,
+            totalItems: filtered.length,
+            pageSize,
+            onPageChange: setPage,
+            onPageSizeChange: handlePageSize,
+            pageSizeOptions: [10, 20, 50],
+          }}
+          empty={{
+            icon: <FiMessageSquare className="h-7 w-7" aria-hidden />,
+            title: "No reviews found",
+            description: "Try adjusting your search or filters.",
+          }}
+        />
+      )}
 
       <Modal
         open={detailsTarget !== null}
         onClose={() => setDetailsTarget(null)}
         title="Review details"
-        subtitle={detailsTarget ? `Review by ${detailsTarget.name}` : undefined}
+        subtitle={detailsTarget ? `Review by ${detailsTarget.user?.name ?? detailsTarget.name ?? "customer"}` : undefined}
         size="md"
       >
         {detailsTarget && (
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-sm text-muted-foreground">{detailsTarget.productName}</p>
+                <p className="text-sm text-muted-foreground">{detailsTarget.product?.name ?? "—"}</p>
                 <h3 className="text-base font-bold text-foreground">
                   {detailsTarget.title}
                 </h3>
@@ -351,7 +324,7 @@ export default function AdminReviewsPage() {
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <Stars rating={detailsTarget.rating} />
                 <span className="text-xs text-muted-foreground">
-                  {formatDate(detailsTarget.date)}
+                  {formatDate(detailsTarget.createdAt)}
                 </span>
               </div>
             </div>
@@ -382,15 +355,6 @@ export default function AdminReviewsPage() {
           </div>
         )}
       </Modal>
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={remove}
-        title="Delete review?"
-        description={`This will permanently remove the review by “${deleteTarget?.name}”. This action cannot be undone.`}
-        confirmLabel="Delete"
-      />
     </div>
   );
 }

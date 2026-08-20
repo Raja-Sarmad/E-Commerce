@@ -10,11 +10,9 @@ import {
 } from "react-icons/fi";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { categories } from "@/lib/data/categories";
-import { products } from "@/lib/data/products";
+import { useCategories, useBrands } from "@/hooks/use-catalog";
 import { cn } from "@/lib/utils";
 
-const brands = [...new Set(products.map((p) => p.brand))];
 const priceBrackets = [
   { label: "Under $50", min: 0, max: 50 },
   { label: "$50 – $100", min: 50, max: 100 },
@@ -30,6 +28,9 @@ type FilterSidebarProps = {
 export function FilterSidebar({ onClose }: FilterSidebarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: categories = [] } = useCategories();
+  const { data: brandsData = [] } = useBrands();
+  const brands = brandsData.map((b) => b.name);
 
   const category = searchParams.get("category") ?? "";
   const [selectedBrands, setSelectedBrands] = useState<string[]>(

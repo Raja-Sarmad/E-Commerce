@@ -37,16 +37,17 @@ import {
 } from "react-icons/fi";
 import { Badge } from "@/components/ui/Badge";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
-import { useAuth } from "@/context/AuthProvider";
-import { useTheme } from "@/context/ThemeProvider";
+import { useGetMeQuery, useLogoutMutation } from "@/lib/rtk/authApi";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "@/lib/rtk/store";
+import { clearAuthCookies } from "@/lib/rtk/authSlice";
+import { baseApi } from "@/lib/rtk/baseApi";
+import { useTheme } from "@/hooks/use-theme";
 import { cn, timeAgo } from "@/lib/utils";
-import { products } from "@/lib/data/products";
-import { sampleOrders, sampleUsers } from "@/lib/data/content";
 import {
-  adminBlogPosts,
-  contactMessages,
-  notifications,
-} from "@/lib/data/admin";
+  useGetAdminNotificationsQuery,
+  useGetAdminMessagesQuery,
+} from "@/lib/rtk/adminApi";
 
 function useClickOutside(
   refs: (React.RefObject<HTMLDivElement | null> | null)[],
@@ -125,7 +126,9 @@ export function AdminTopbar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const dispatch = useDispatch<AppDispatch>();
+  const { data: user } = useGetMeQuery();
+  const [logoutMutation] = useLogoutMutation();
   const { theme, toggleTheme } = useTheme();
 
   const [search, setSearch] = useState("");
@@ -150,54 +153,15 @@ export function AdminTopbar({
   useClickOutside([langRef], () => setLangOpen(false), langOpen);
   useClickOutside([quickRef], () => setQuickOpen(false), quickOpen);
 
+  const { data: notifData } = useGetAdminNotificationsQuery();
+  const { data: msgData } = useGetAdminMessagesQuery({});
+  const notifications = Array.isArray(notifData) ? notifData : [];
+  const contactMessages = Array.isArray(msgData?.items) ? msgData.items : [];
+
   const unread = notifications.filter((n) => !n.read).length;
-  const unreadMessages = contactMessages.filter((m) => m.status === "unread").length;
+  const unreadMessages = contactMessages.filter((m: Record<string, unknown>) => m.status === "unread").length;
 
   const currentPage = navTitle(pathname);
-
-  const searchResults = (() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    const matches = (value: string) => value.toLowerCase().includes(q);
-    return [
-      ...products
-        .filter((p) => matches(p.name) || matches(p.sku))
-        .slice(0, 4)
-        .map((p) => ({
-          href: "/admin/products",
-          icon: <FiBox className="h-4 w-4" aria-hidden />,
-          title: p.name,
-          subtitle: `Product · ${p.sku}`,
-        })),
-      ...sampleOrders
-        .filter((o) => matches(o.number))
-        .slice(0, 3)
-        .map((o) => ({
-          href: "/admin/orders",
-          icon: <FiShoppingBag className="h-4 w-4" aria-hidden />,
-          title: `Order #${o.number}`,
-          subtitle: `Order · ${o.status}`,
-        })),
-      ...sampleUsers
-        .filter((u) => matches(u.name) || matches(u.email))
-        .slice(0, 3)
-        .map((u) => ({
-          href: "/admin/customers",
-          icon: <FiUsers className="h-4 w-4" aria-hidden />,
-          title: u.name,
-          subtitle: `Customer · ${u.email}`,
-        })),
-      ...adminBlogPosts
-        .filter((b) => matches(b.title))
-        .slice(0, 3)
-        .map((b) => ({
-          href: "/admin/blog",
-          icon: <FiPenTool className="h-4 w-4" aria-hidden />,
-          title: b.title,
-          subtitle: "Blog post",
-        })),
-    ];
-  })();
 
   const goTo = (href: string) => {
     setSearchOpen(false);
@@ -255,18 +219,18 @@ export function AdminTopbar({
           {searchOpen && (
             <div className="animate-scale-in absolute right-0 top-full z-50 mt-2 w-96 overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
               <div className="border-b border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Search results
+                Quick navigation
               </div>
-              {searchResults.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  {search.trim()
-                    ? `No results for "${search}"`
-                    : "Type to search products, orders, customers & posts"}
-                </p>
-              ) : (
-                <ul className="max-h-96 overflow-y-auto p-1.5">
-                  {searchResults.map((r, i) => (
-                    <li key={`${r.title}-${i}`}>
+              <ul className="p-1.5">
+                {[
+                  { href: "/admin/products", icon: <FiBox className="h-4 w-4" aria-hidden />, title: "Products" },
+                  { href: "/admin/orders", icon: <FiShoppingBag className="h-4 w-4" aria-hidden />, title: "Orders" },
+                  { href: "/admin/customers", icon: <FiUsers className="h-4 w-4" aria-hidden />, title: "Customers" },
+                  { href: "/admin/blog", icon: <FiPenTool className="h-4 w-4" aria-hidden />, title: "Blog posts" },
+                  { href: "/admin/categories", icon: <FiPackage className="h-4 w-4" aria-hidden />, title: "Categories" },
+                  { href: "/admin/settings", icon: <FiSettings className="h-4 w-4" aria-hidden />, title: "Settings" },
+                ].filter((r) => !search.trim() || r.title.toLowerCase().includes(search.trim().toLowerCase())).map((r) => (
+                    <li key={r.href}>
                       <button
                         type="button"
                         onClick={() => goTo(r.href)}
@@ -279,9 +243,6 @@ export function AdminTopbar({
                           <span className="block truncate text-sm font-semibold text-foreground">
                             {r.title}
                           </span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {r.subtitle}
-                          </span>
                         </span>
                         <FiExternalLink
                           className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
@@ -290,8 +251,7 @@ export function AdminTopbar({
                       </button>
                     </li>
                   ))}
-                </ul>
-              )}
+              </ul>
             </div>
           )}
         </div>
@@ -426,7 +386,7 @@ export function AdminTopbar({
           </div>
           <ul className="max-h-80 overflow-y-auto divide-y divide-border">
             {notifications.slice(0, 5).map((n) => (
-              <li key={n.id}>
+              <li key={n._id}>
                 <Link
                   href={n.link ?? "/admin/notifications"}
                   onClick={() => setNotifOpen(false)}
@@ -462,7 +422,7 @@ export function AdminTopbar({
                       {n.message}
                     </span>
                     <span className="mt-0.5 block text-[11px] text-muted-foreground/70">
-                      {n.time}
+                      {timeAgo(n.createdAt)}
                     </span>
                   </span>
                   {!n.read && (
@@ -510,28 +470,28 @@ export function AdminTopbar({
             </Link>
           </div>
           <ul className="max-h-80 divide-y divide-border overflow-y-auto">
-            {contactMessages.slice(0, 5).map((m) => (
-              <li key={m.id}>
+            {contactMessages.slice(0, 5).map((m: Record<string, unknown>) => (
+              <li key={String(m._id)}>
                 <Link
                   href="/admin/messages"
                   onClick={() => setMsgOpen(false)}
                   className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted"
                 >
-                  <AdminAvatar name={m.name} size="sm" />
+                  <AdminAvatar name={String(m.name ?? "")} size="sm" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold text-foreground">
-                        {m.name}
+                        {String(m.name ?? "")}
                       </span>
                       <span className="shrink-0 text-[11px] text-muted-foreground/70">
-                        {timeAgo(m.date)}
+                        {timeAgo(String(m.createdAt ?? ""))}
                       </span>
                     </span>
                     <span className="block truncate text-xs font-medium text-foreground">
-                      {m.subject}
+                      {String(m.subject ?? "")}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {m.message}
+                      {String(m.message ?? "")}
                     </span>
                   </span>
                   {m.status === "unread" && (
@@ -597,8 +557,14 @@ export function AdminTopbar({
           <div className="border-t border-border p-1.5">
             <button
               type="button"
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                try {
+                  await logoutMutation().unwrap();
+                } catch {
+                  // Ignore errors — clear local state anyway
+                }
+                dispatch(clearAuthCookies());
+                dispatch(baseApi.util.resetApiState());
                 router.push("/login");
               }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"

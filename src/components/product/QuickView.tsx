@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { FiShoppingBag, FiCheck } from "react-icons/fi";
+import { useSelector, useDispatch } from "react-redux";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Rating } from "@/components/ui/Rating";
 import { Badge } from "@/components/ui/Badge";
 import { ProductImage } from "@/components/ui/ProductImage";
-import { useCart } from "@/context/CartProvider";
-import { useToast } from "@/context/ToastProvider";
+import { AuthRequiredModal } from "@/components/ui/AuthRequiredModal";
+import { addItem, updateQuantity, selectIsInCart } from "@/lib/rtk/cartSlice";
+import { toast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { useState } from "react";
@@ -20,10 +24,13 @@ type QuickViewProps = {
 };
 
 export function QuickView({ product, open, onClose }: QuickViewProps) {
-  const { addItem } = useCart();
-  const { success } = useToast();
+  const dispatch = useDispatch();
+  const { isAdmin } = useIsAdmin();
+  const { data: user } = useGetMeQuery();
+  const inCart = useSelector(selectIsInCart(product.id));
   const [added, setAdded] = useState(false);
   const [qty, setQty] = useState(1);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const discount = product.compareAtPrice
     ? Math.round(
@@ -32,9 +39,18 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
     : 0;
 
   const handleAdd = () => {
-    addItem(product, qty);
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (inCart) {
+      dispatch(updateQuantity({ productId: product.id, quantity: qty }));
+      toast.success("Cart updated", `${qty} × ${product.name}`);
+    } else {
+      dispatch(addItem({ product, quantity: qty }));
+      toast.success("Added to cart", `${qty} × ${product.name}`);
+    }
     setAdded(true);
-    success("Added to cart", `${qty} × ${product.name}`);
     setTimeout(() => {
       setAdded(false);
       setQty(1);
@@ -52,7 +68,7 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
       <div className="grid gap-8 md:grid-cols-2">
         <div className="relative overflow-hidden rounded-xl bg-muted">
           <ProductImage
-            src={product.images[0]}
+            src={product.images?.[0] ?? ""}
             alt={product.name}
             className="aspect-square w-full"
           />
@@ -109,41 +125,47 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
             ))}
           </ul>
 
-          <div className="mt-6 flex items-center gap-3">
-            <div className="flex items-center rounded-lg border border-border">
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                aria-label="Decrease quantity"
-                className="px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
-              >
-                −
-              </button>
-              <span className="w-8 text-center text-sm font-semibold text-foreground">
-                {qty}
-              </span>
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.min(99, q + 1))}
-                aria-label="Increase quantity"
-                className="px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
-              >
-                +
-              </button>
+          {!isAdmin && (
+            <div className="mt-6 flex items-center gap-3">
+              <div className="flex items-center rounded-lg border border-border">
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  aria-label="Decrease quantity"
+                  className="px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  −
+                </button>
+                <span className="w-8 text-center text-sm font-semibold text-foreground">
+                  {qty}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.min(99, q + 1))}
+                  aria-label="Increase quantity"
+                  className="px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  +
+                </button>
+              </div>
+              <Button onClick={handleAdd} className="flex-1" disabled={product.stock === 0}>
+                {added ? (
+                  <>
+                    <FiCheck className="h-4 w-4" aria-hidden /> Added to cart
+                  </>
+                ) : inCart ? (
+                  <>
+                    <FiShoppingBag className="h-4 w-4" aria-hidden /> Update cart
+                  </>
+                ) : (
+                  <>
+                    <FiShoppingBag className="h-4 w-4" aria-hidden />
+                    {product.stock === 0 ? "Out of stock" : "Add to cart"}
+                  </>
+                )}
+              </Button>
             </div>
-            <Button onClick={handleAdd} className="flex-1" disabled={product.stock === 0}>
-              {added ? (
-                <>
-                  <FiCheck className="h-4 w-4" aria-hidden /> Added to cart
-                </>
-              ) : (
-                <>
-                  <FiShoppingBag className="h-4 w-4" aria-hidden />
-                  {product.stock === 0 ? "Out of stock" : "Add to cart"}
-                </>
-              )}
-            </Button>
-          </div>
+          )}
 
           <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
             <span className="text-sm text-muted-foreground">SKU: {product.sku}</span>
@@ -157,6 +179,7 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
           </div>
         </div>
       </div>
+      <AuthRequiredModal open={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </Modal>
   );
 }

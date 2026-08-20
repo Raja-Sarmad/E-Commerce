@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/Badge";
 import { ProductCard } from "@/components/product/ProductCard";
 import { FilterSidebar } from "@/components/shop/FilterSidebar";
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
-import { products, searchProducts } from "@/lib/data/products";
-import { categories, getCategoryBySlug } from "@/lib/data/categories";
-import { filterAndSortProducts, paginate } from "@/lib/filter";
+import { getProducts, getCategories, getCategoryBySlug } from "@/lib/api/server";
 import { FiSearch } from "react-icons/fi";
 
 const PER_PAGE = 12;
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Shop",
@@ -27,27 +27,49 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   const params = await searchParams;
 
   const categorySlug = typeof params.category === "string" ? params.category : "";
-  const category = categorySlug ? getCategoryBySlug(categorySlug) : undefined;
+  const category = categorySlug ? await getCategoryBySlug(categorySlug) : undefined;
   if (categorySlug && !category) {
     notFound();
   }
 
-  const query = {
-    category: categorySlug,
-    brand: typeof params.brand === "string" ? params.brand : undefined,
-    min: typeof params.min === "string" ? params.min : undefined,
-    max: typeof params.max === "string" ? params.max : undefined,
-    rating: typeof params.rating === "string" ? params.rating : undefined,
-    inStock: typeof params.inStock === "string" ? params.inStock : undefined,
-    sale: typeof params.sale === "string" ? params.sale : undefined,
-    sort: typeof params.sort === "string" ? params.sort : undefined,
-  };
-
   const page = Math.max(1, Number(params.page) || 1);
-  const filtered = filterAndSortProducts(products, query);
-  const { items: pageItems, total, totalPages } = paginate(filtered, page, PER_PAGE);
+  const rating = typeof params.rating === "string" ? Number(params.rating) : undefined;
+
+  let products: Awaited<ReturnType<typeof getProducts>>["products"] = [];
+  let meta = { page: 1, limit: PER_PAGE, total: 0, totalPages: 1 };
+  try {
+    const result = await getProducts({
+      categorySlug: categorySlug || undefined,
+      brand: typeof params.brand === "string" ? params.brand : undefined,
+      minPrice: typeof params.min === "string" ? Number(params.min) : undefined,
+      maxPrice: typeof params.max === "string" ? Number(params.max) : undefined,
+      inStock: typeof params.inStock === "string" ? params.inStock === "true" : undefined,
+      onSale: typeof params.sale === "string" ? params.sale === "on" : undefined,
+      sort: typeof params.sort === "string" ? params.sort : undefined,
+      page,
+      limit: PER_PAGE,
+    });
+    products = result.products;
+    meta = result.meta;
+  } catch {
+    // backend unavailable — render empty shop
+  }
+
+  const pageItems = rating && !Number.isNaN(rating)
+    ? products.filter((p) => p.rating >= rating)
+    : products;
+
+  const total = rating && !Number.isNaN(rating) ? pageItems.length : meta.total;
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
-  const to = Math.min(page * PER_PAGE, total);
+  const to = Math.min(from + pageItems.length - 1, total);
+
+  let categories: Awaited<ReturnType<typeof getCategories>> = [];
+  try {
+    categories = await getCategories();
+  } catch {
+    // ignore
+  }
 
   return (
     <Container className="py-6">

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FiArrowRight, FiSearch, FiX } from "react-icons/fi";
-import { searchProducts } from "@/lib/data/products";
+import { useSearchProducts } from "@/hooks/use-catalog";
+import { useDebounce } from "@/hooks/use-debounce";
 import { formatPrice } from "@/lib/utils";
 import { ProductImage } from "@/components/ui/ProductImage";
 
@@ -33,7 +34,9 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
     };
   }, [open]);
 
-  const results = useMemo(() => searchProducts(query).slice(0, 6), [query]);
+  const debouncedQuery = useDebounce(query, 250);
+  const { data: searchResults = [] } = useSearchProducts(debouncedQuery);
+  const results = searchResults.slice(0, 6);
 
   if (!open) return null;
 
@@ -135,7 +138,7 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                     className="group flex items-center gap-4 rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/40 hover:shadow-md"
                   >
                     <ProductImage
-                      src={product.images[0]}
+                      src={product.images?.[0] ?? ""}
                       alt={product.name}
                       className="h-14 w-14 shrink-0 rounded-lg"
                       imgClassName="rounded-lg"

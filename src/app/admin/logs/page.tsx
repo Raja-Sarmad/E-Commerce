@@ -18,24 +18,24 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { useToast } from "@/context/ToastProvider";
-import { logs } from "@/lib/data/admin";
-import type { LogEntry } from "@/lib/data/admin";
+import { toast } from "@/hooks/use-toast";
+import {
+  useGetAdminLogsQuery,
+  useClearLogsMutation,
+  type AdminLog,
+} from "@/lib/rtk/adminApi";
 import { formatDate, formatNumber } from "@/lib/utils";
 
 const PER_PAGE = 10;
 
-const typeVariant: Record<
-  LogEntry["type"],
-  "primary" | "info" | "destructive" | "outline"
-> = {
+const typeVariant: Record<string, "primary" | "info" | "destructive" | "outline"> = {
   login: "primary",
   activity: "info",
   error: "destructive",
   audit: "outline",
 };
 
-const levelStatus: Record<LogEntry["level"], string> = {
+const levelStatus: Record<string, string> = {
   info: "info",
   warning: "warning",
   error: "failed",
@@ -43,14 +43,19 @@ const levelStatus: Record<LogEntry["level"], string> = {
 };
 
 export default function AdminLogsPage() {
-  const { success } = useToast();
-  const [items, setItems] = useState<LogEntry[]>(logs);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [clearOpen, setClearOpen] = useState(false);
+
+  const { data: logsData, isLoading } = useGetAdminLogsQuery({});
+  const [clearLogsApi] = useClearLogsMutation();
+
+  const items: AdminLog[] = useMemo(() => {
+    return Array.isArray(logsData) ? logsData : [];
+  }, [logsData]);
 
   const stats = useMemo(
     () => ({
@@ -67,7 +72,7 @@ export default function AdminLogsPage() {
     return items.filter((l) => {
       const matchesQuery =
         !q ||
-        l.user.toLowerCase().includes(q) ||
+        (l.user ?? "").toLowerCase().includes(q) ||
         l.action.toLowerCase().includes(q) ||
         l.details.toLowerCase().includes(q) ||
         l.ip.toLowerCase().includes(q);
@@ -80,10 +85,14 @@ export default function AdminLogsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const clearLogs = () => {
-    setItems([]);
-    setClearOpen(false);
-    success("Logs cleared", "All log entries were removed.");
+  const handleClearLogs = async () => {
+    try {
+      await clearLogsApi().unwrap();
+      setClearOpen(false);
+      toast.success("Logs cleared", "All log entries were removed.");
+    } catch {
+      toast.error("Failed", "Could not clear logs.");
+    }
   };
 
   const handlePageSize = (size: number) => {
@@ -97,16 +106,16 @@ export default function AdminLogsPage() {
       minute: "2-digit",
     });
 
-  const columns: Column<LogEntry>[] = [
+  const columns: Column<AdminLog>[] = [
     {
       key: "timestamp",
       header: "Timestamp",
       sortable: true,
-      sortValue: (l) => l.timestamp,
+      sortValue: (l) => l.createdAt,
       render: (l) => (
         <div className="whitespace-nowrap">
-          <p className="font-semibold text-foreground">{formatDate(l.timestamp)}</p>
-          <p className="text-xs text-muted-foreground">{formatTime(l.timestamp)}</p>
+          <p className="font-semibold text-foreground">{formatDate(l.createdAt)}</p>
+          <p className="text-xs text-muted-foreground">{formatTime(l.createdAt)}</p>
         </div>
       ),
     },
@@ -116,7 +125,7 @@ export default function AdminLogsPage() {
       sortable: true,
       sortValue: (l) => l.type,
       render: (l) => (
-        <Badge variant={typeVariant[l.type]} className="whitespace-nowrap">
+        <Badge variant={typeVariant[l.type] ?? "outline"} className="whitespace-nowrap">
           {l.type}
         </Badge>
       ),
@@ -128,17 +137,17 @@ export default function AdminLogsPage() {
       sortable: true,
       sortValue: (l) => l.level,
       render: (l) => (
-        <StatusBadge status={levelStatus[l.level]} label={l.level} />
+        <StatusBadge status={levelStatus[l.level] ?? "info"} label={l.level} />
       ),
     },
     {
       key: "user",
       header: "User",
       sortable: true,
-      sortValue: (l) => l.user,
+      sortValue: (l) => l.user ?? "",
       render: (l) => (
         <span className="max-w-[180px] truncate text-muted-foreground">
-          {l.user}
+          {l.user ?? "System"}
         </span>
       ),
     },
@@ -189,10 +198,10 @@ export default function AdminLogsPage() {
             <ExportButton
               filename="system-logs"
               data={filtered.map((l) => ({
-                Timestamp: l.timestamp,
+                Timestamp: l.createdAt,
                 Type: l.type,
                 Level: l.level,
-                User: l.user,
+                User: l.user ?? "System",
                 Action: l.action,
                 Details: l.details,
                 IP: l.ip,
@@ -302,10 +311,11 @@ export default function AdminLogsPage() {
         }
       />
 
-      <DataTable<LogEntry>
+      <DataTable<AdminLog>
         columns={columns}
         rows={pageItems}
-        rowKey={(l) => l.id}
+        rowKey={(l) => l._id}
+        loading={isLoading}
         pagination={{
           page,
           totalPages,
@@ -325,7 +335,7 @@ export default function AdminLogsPage() {
       <ConfirmDialog
         open={clearOpen}
         onClose={() => setClearOpen(false)}
-        onConfirm={clearLogs}
+        onConfirm={handleClearLogs}
         title="Clear all logs?"
         description="This will permanently remove every log entry. This action cannot be undone."
         confirmLabel="Clear logs"

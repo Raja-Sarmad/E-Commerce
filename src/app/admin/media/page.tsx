@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   FiFileText,
   FiFolder,
@@ -18,16 +18,24 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import {
-  generateId,
-  mediaFiles,
-  mediaFoldersList,
-} from "@/lib/data/admin";
-import type { MediaFile } from "@/lib/data/admin";
+  useGetMediaQuery,
+  useUploadMediaMutation,
+  useDeleteMediaMutation,
+} from "@/lib/rtk/adminApi";
+import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { cn, formatDate } from "@/lib/utils";
+
+type MediaFile = {
+  id: string;
+  name: string;
+  url: string;
+  type: "image" | "video" | "document";
+  size: string;
+  folder: string;
+  uploadedAt: string;
+};
 
 const typeVariant: Record<
   MediaFile["type"],
@@ -38,23 +46,44 @@ const typeVariant: Record<
   document: "outline",
 };
 
-type UploadForm = {
-  name: string;
-  type: MediaFile["type"];
-};
-
-const emptyUpload: UploadForm = {
-  name: "",
-  type: "image",
-};
+function toMediaFile(raw: Record<string, unknown>): MediaFile {
+  const mime = String(raw.mimeType ?? "");
+  const type: MediaFile["type"] = mime.startsWith("video/")
+    ? "video"
+    : mime.startsWith("application/") || mime.startsWith("text/")
+      ? "document"
+      : "image";
+  const sizeBytes = Number(raw.size ?? 0);
+  const size =
+    sizeBytes > 0
+      ? sizeBytes > 1024 * 1024
+        ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(sizeBytes / 1024)} KB`
+      : "—";
+  return {
+    id: String(raw._id ?? ""),
+    name: String(raw.name ?? raw.originalName ?? "Untitled"),
+    url: String(raw.url ?? ""),
+    type,
+    size,
+    folder: String(raw.folder ?? "Other"),
+    uploadedAt: String(raw.uploadedAt ?? raw.createdAt ?? new Date().toISOString()),
+  };
+}
 
 export default function AdminMediaPage() {
-  const { success, warning } = useToast();
-  const [items, setItems] = useState<MediaFile[]>(mediaFiles);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: rawFiles = [], isLoading } = useGetMediaQuery({});
+  const [uploadMedia, { isLoading: isUploading }] = useUploadMediaMutation();
+  const [deleteMedia] = useDeleteMediaMutation();
+
+  const items = useMemo(() => rawFiles.map(toMediaFile), [rawFiles]);
+
   const [folder, setFolder] = useState("all");
   const [query, setQuery] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadForm, setUploadForm] = useState<UploadForm>(emptyUpload);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<MediaFile | null>(null);
 
   const filtered = useMemo(() => {
@@ -66,41 +95,49 @@ export default function AdminMediaPage() {
     });
   }, [items, folder, query]);
 
+  const folders = useMemo(
+    () => [...new Set(items.map((f) => f.folder))].sort(),
+    [items]
+  );
   const folderCount = (name: string) =>
-    mediaFoldersList.find((f) => f.name === name)?.files ?? 0;
+    items.filter((f) => f.folder === name).length;
 
   const openUpload = () => {
-    setUploadForm(emptyUpload);
+    setPendingFile(null);
+    setUploadName("");
     setUploadOpen(true);
   };
 
-  const handleUpload = () => {
-    const name = uploadForm.name.trim();
-    if (!name) {
-      warning("File name required", "Please enter a file name.");
+  const handleUpload = async () => {
+    if (!pendingFile) {
+      toast.warning("File required", "Please choose a file to upload.");
       return;
     }
-    const targetFolder = folder === "all" ? "Other" : folder;
-    const file: MediaFile = {
-      id: generateId("mf"),
-      name,
-      url: `https://picsum.photos/seed/upload-${Date.now()}/600/600`,
-      type: uploadForm.type,
-      size: "—",
-      folder: targetFolder,
-      uploadedAt: new Date().toISOString(),
-    };
-    setItems((prev) => [file, ...prev]);
-    setUploadOpen(false);
-    setUploadForm(emptyUpload);
-    success("File uploaded", `“${name}” was added to the media library.`);
+    try {
+      const form = new FormData();
+      form.append("file", pendingFile);
+      if (uploadName.trim()) form.append("name", uploadName.trim());
+      if (folder !== "all") form.append("folder", folder);
+      await uploadMedia(form).unwrap();
+      setUploadOpen(false);
+      toast.success(
+        "File uploaded",
+        `"${uploadName.trim() || pendingFile.name}" was added to the media library.`
+      );
+    } catch (err) {
+      toast.warning("Upload failed", getErrorMessage(err));
+    }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((f) => f.id !== deleteTarget.id));
-    success("File removed", `“${deleteTarget.name}” was deleted.`);
-    setDeleteTarget(null);
+    try {
+      await deleteMedia(deleteTarget.id).unwrap();
+      toast.success("File removed", `"${deleteTarget.name}" was deleted.`);
+      setDeleteTarget(null);
+    } catch (err) {
+      toast.warning("Could not delete", getErrorMessage(err));
+    }
   };
 
   return (
@@ -143,27 +180,27 @@ export default function AdminMediaPage() {
                 <span className="truncate">All media</span>
               </span>
               <span className="text-xs text-muted-foreground">
-                {mediaFiles.length}
+                {items.length}
               </span>
             </button>
-            {mediaFoldersList.map((f) => (
+            {folders.map((name) => (
               <button
-                key={f.id}
+                key={name}
                 type="button"
-                onClick={() => setFolder(f.name)}
+                onClick={() => setFolder(name)}
                 className={cn(
                   "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
-                  folder === f.name
+                  folder === name
                     ? "bg-primary/10 font-semibold text-primary"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <FiFolder className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="truncate">{f.name}</span>
+                  <span className="truncate">{name}</span>
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {folderCount(f.name)}
+                  {folderCount(name)}
                 </span>
               </button>
             ))}
@@ -183,7 +220,7 @@ export default function AdminMediaPage() {
             }
           />
 
-          {filtered.length === 0 ? (
+          {!isLoading && filtered.length === 0 ? (
             <div className="mt-6">
               <EmptyState
                 icon={<FiImage className="h-7 w-7" aria-hidden />}
@@ -202,7 +239,7 @@ export default function AdminMediaPage() {
                       <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                         <FiFileText className="h-10 w-10" aria-hidden />
                       </div>
-                    ) : (
+                    ) : file.url ? (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -218,6 +255,10 @@ export default function AdminMediaPage() {
                           </span>
                         )}
                       </>
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <FiImage className="h-10 w-10" aria-hidden />
+                      </div>
                     )}
                     <button
                       type="button"
@@ -259,45 +300,30 @@ export default function AdminMediaPage() {
         size="md"
       >
         <div className="space-y-4">
-          <Input
+          <input
+            ref={fileInputRef}
             type="file"
-            label="File"
-            hint="Demo upload — pick any file; only the name is stored."
-            containerClassName=""
+            onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary"
           />
-          <Input
-            label="Name"
-            value={uploadForm.name}
-            onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
-            placeholder="e.g. product-01.jpg"
-          />
-          <Select
-            label="Type"
-            value={uploadForm.type}
-            onChange={(e) =>
-              setUploadForm({
-                ...uploadForm,
-                type: e.target.value as MediaFile["type"],
-              })
-            }
-          >
-            <option value="image">Image</option>
-            <option value="video">Video</option>
-            <option value="document">Document</option>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            The file will be added to the{" "}
-            <span className="font-semibold text-foreground">
-              {folder === "all" ? "Other" : folder}
-            </span>{" "}
-            folder.
-          </p>
+          {pendingFile && (
+            <p className="text-xs text-muted-foreground">
+              Selected:{" "}
+              <span className="font-semibold text-foreground">
+                {pendingFile.name}
+              </span>{" "}
+              ({Math.round(pendingFile.size / 1024)} KB)
+            </p>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setUploadOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpload}>
-              <FiUpload className="h-4 w-4" aria-hidden />
+            <Button
+              onClick={handleUpload}
+              loading={isUploading}
+              leftIcon={!isUploading ? <FiUpload className="h-4 w-4" aria-hidden /> : undefined}
+            >
               Upload file
             </Button>
           </div>
@@ -309,7 +335,7 @@ export default function AdminMediaPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={remove}
         title="Delete file?"
-        description={`This will permanently remove “${deleteTarget?.name}”. This action cannot be undone.`}
+        description={`This will permanently remove "${deleteTarget?.name}". This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>

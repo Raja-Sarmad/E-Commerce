@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FiBarChart2, FiChevronRight, FiUser } from "react-icons/fi";
+import { useSelector } from "react-redux";
 import { Drawer } from "@/components/ui/Drawer";
 import { Logo } from "./Logo";
-import { useAuth } from "@/context/AuthProvider";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
+import { useGetStorefrontCategoriesQuery } from "@/lib/rtk/storefrontApi";
 import { navLinks } from "@/lib/site";
-import { categories } from "@/lib/data/categories";
 import { cn } from "@/lib/utils";
 
 type MobileNavProps = {
@@ -17,7 +18,9 @@ type MobileNavProps = {
 
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const pathname = usePathname();
-  const { user, isAdmin } = useAuth();
+  const { data: user } = useGetMeQuery();
+  const { data: categories = [] } = useGetStorefrontCategoriesQuery();
+  const isAdmin = user && ["admin", "super_admin", "manager", "editor", "vendor"].includes(user.role);
 
   return (
     <Drawer

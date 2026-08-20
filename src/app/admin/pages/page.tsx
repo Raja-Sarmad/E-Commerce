@@ -11,39 +11,34 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
+import {
+  useGetAdminPagesQuery,
+  useCreatePageMutation,
+  useUpdatePageMutation,
+  useDeletePageMutation,
+  type AdminPage,
+} from "@/lib/rtk/adminApi";
+import { getErrorMessage } from "@/lib/rtk/baseApi";
 
-type Page = {
-  id: string;
-  title: string;
-  slug: string;
-  section: "Main" | "Legal" | "Support";
-  status: "published" | "draft";
-  updatedAt: string;
-};
+type PageItem = AdminPage;
 
-const initialPages: Page[] = [
-  { id: "pg-001", title: "About Us", slug: "about", section: "Main", status: "published", updatedAt: "2026-07-28T09:12:00Z" },
-  { id: "pg-002", title: "Contact", slug: "contact", section: "Main", status: "published", updatedAt: "2026-07-21T14:40:00Z" },
-  { id: "pg-003", title: "Terms of Service", slug: "terms", section: "Legal", status: "published", updatedAt: "2026-07-15T10:05:00Z" },
-  { id: "pg-004", title: "Privacy Policy", slug: "privacy", section: "Legal", status: "published", updatedAt: "2026-07-15T10:08:00Z" },
-  { id: "pg-005", title: "Shipping & Returns", slug: "shipping-returns", section: "Support", status: "published", updatedAt: "2026-07-02T16:22:00Z" },
-  { id: "pg-006", title: "FAQ", slug: "faq", section: "Support", status: "draft", updatedAt: "2026-06-27T11:48:00Z" },
-  { id: "pg-007", title: "Careers", slug: "careers", section: "Main", status: "draft", updatedAt: "2026-06-19T08:30:00Z" },
-];
-
-const emptyDraft = { title: "", slug: "", section: "Main" as Page["section"], status: "draft" as Page["status"], body: "" };
+const emptyDraft = { title: "", slug: "", status: "draft" as PageItem["status"], content: "" };
 
 export default function AdminPagesPage() {
-  const { toast, success, error } = useToast();
-  const [pages, setPages] = useState<Page[]>(initialPages);
+  const { data, isLoading } = useGetAdminPagesQuery({});
+  const [createPage] = useCreatePageMutation();
+  const [updatePage] = useUpdatePageMutation();
+  const [deletePage] = useDeletePageMutation();
+
+  const pages: PageItem[] = data?.items ?? [];
+
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Page["status"]>("all");
-  const [sectionFilter, setSectionFilter] = useState<"all" | Page["section"]>("all");
-  const [editing, setEditing] = useState<Page | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | string>("all");
+  const [editing, setEditing] = useState<PageItem | null>(null);
   const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState<Page | null>(null);
+  const [deleting, setDeleting] = useState<PageItem | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
 
   const filtered = pages.filter((p) => {
@@ -52,8 +47,7 @@ export default function AdminPagesPage() {
       p.title.toLowerCase().includes(query.toLowerCase()) ||
       p.slug.toLowerCase().includes(query.toLowerCase());
     const matchStatus = statusFilter === "all" || p.status === statusFilter;
-    const matchSection = sectionFilter === "all" || p.section === sectionFilter;
-    return matchQuery && matchStatus && matchSection;
+    return matchQuery && matchStatus;
   });
 
   const openCreate = () => {
@@ -61,60 +55,66 @@ export default function AdminPagesPage() {
     setCreating(true);
   };
 
-  const openEdit = (page: Page) => {
-    setDraft({ title: page.title, slug: page.slug, section: page.section, status: page.status, body: "" });
+  const openEdit = (page: PageItem) => {
+    setDraft({ title: page.title, slug: page.slug, status: page.status, content: page.content ?? "" });
     setEditing(page);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!draft.title.trim()) {
-      error("Title required", "Enter a page title to continue.");
+      toast.error("Title required", "Enter a page title to continue.");
       return;
     }
-    if (editing) {
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === editing.id
-            ? { ...p, title: draft.title, slug: draft.slug || draft.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"), section: draft.section, status: draft.status, updatedAt: new Date().toISOString() }
-            : p
-        )
-      );
-      success("Page updated", `${draft.title} has been saved.`);
-      setEditing(null);
-    } else {
-      const page: Page = {
-        id: `pg-${String(pages.length + 1).padStart(3, "0")}`,
-        title: draft.title,
-        slug: draft.slug || draft.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        section: draft.section,
-        status: draft.status,
-        updatedAt: new Date().toISOString(),
-      };
-      setPages((prev) => [page, ...prev]);
-      success("Page created", `${page.title} has been added.`);
-      setCreating(false);
+    try {
+      if (editing) {
+        await updatePage({
+          id: editing._id,
+          body: {
+            title: draft.title,
+            slug: draft.slug || draft.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+            status: draft.status,
+            content: draft.content,
+          },
+        }).unwrap();
+        toast.success("Page updated", `${draft.title} has been saved.`);
+        setEditing(null);
+      } else {
+        await createPage({
+          title: draft.title,
+          slug: draft.slug || draft.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          status: draft.status,
+          content: draft.content,
+        }).unwrap();
+        toast.success("Page created", `${draft.title} has been added.`);
+        setCreating(false);
+      }
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleting) return;
-    setPages((prev) => prev.filter((p) => p.id !== deleting.id));
-    toast("info", "Page deleted", `${deleting.title} has been removed.`);
-    setDeleting(null);
+    try {
+      await deletePage(deleting._id).unwrap();
+      toast.info("Page deleted", `${deleting.title} has been removed.`);
+      setDeleting(null);
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
+    }
   };
 
-  const toggleStatus = (page: Page) => {
-    setPages((prev) =>
-      prev.map((p) =>
-        p.id === page.id
-          ? { ...p, status: p.status === "published" ? "draft" : "published", updatedAt: new Date().toISOString() }
-          : p
-      )
-    );
-    success("Status changed", `${page.title} is now ${page.status === "published" ? "draft" : "published"}.`);
+  const toggleStatus = async (page: PageItem) => {
+    const newStatus = page.status === "published" ? "draft" : "published";
+    try {
+      await updatePage({ id: page._id, body: { status: newStatus } }).unwrap();
+      toast.success("Status changed", `${page.title} is now ${newStatus}.`);
+    } catch (err) {
+      toast.error("Error", getErrorMessage(err));
+    }
   };
 
-  const columns: Column<Page>[] = [
+  const columns: Column<PageItem>[] = [
     {
       key: "title",
       header: "Page",
@@ -133,17 +133,6 @@ export default function AdminPagesPage() {
       ),
     },
     {
-      key: "section",
-      header: "Section",
-      sortable: true,
-      sortValue: (p) => p.section,
-      render: (p) => (
-        <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-          {p.section}
-        </span>
-      ),
-    },
-    {
       key: "status",
       header: "Status",
       sortable: true,
@@ -155,13 +144,13 @@ export default function AdminPagesPage() {
       ),
     },
     {
-      key: "updatedAt",
-      header: "Updated",
+      key: "createdAt",
+      header: "Created",
       sortable: true,
-      sortValue: (p) => p.updatedAt,
+      sortValue: (p) => p.createdAt,
       render: (p) => (
         <span className="text-sm text-muted-foreground">
-          {formatDate(p.updatedAt)}
+          {formatDate(p.createdAt)}
         </span>
       ),
     },
@@ -213,29 +202,19 @@ export default function AdminPagesPage() {
           <div className="flex gap-2">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              onChange={(e) => setStatusFilter(e.target.value)}
               className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
             >
               <option value="all">All statuses</option>
               <option value="published">Published</option>
               <option value="draft">Draft</option>
             </select>
-            <select
-              value={sectionFilter}
-              onChange={(e) => setSectionFilter(e.target.value as typeof sectionFilter)}
-              className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-            >
-              <option value="all">All sections</option>
-              <option value="Main">Main</option>
-              <option value="Legal">Legal</option>
-              <option value="Support">Support</option>
-            </select>
           </div>
         </div>
-        <DataTable<Page>
+        <DataTable<PageItem>
           columns={columns}
           rows={filtered}
-          rowKey={(p) => p.id}
+          rowKey={(p) => p._id}
           cardClassName="border-0 rounded-none shadow-none"
           empty={{
             title: "No pages found",
@@ -265,37 +244,23 @@ export default function AdminPagesPage() {
               <Input value={draft.slug} onChange={(e) => setDraft((d) => ({ ...d, slug: e.target.value }))} placeholder="our-story" />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Section</label>
-              <select
-                value={draft.section}
-                onChange={(e) => setDraft((d) => ({ ...d, section: e.target.value as Page["section"] }))}
-                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-              >
-                <option value="Main">Main</option>
-                <option value="Legal">Legal</option>
-                <option value="Support">Support</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Status</label>
-              <select
-                value={draft.status}
-                onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as Page["status"] }))}
-                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </select>
-            </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Status</label>
+            <select
+              value={draft.status}
+              onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as PageItem["status"] }))}
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
+            >
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">Content</label>
             <Textarea
               rows={8}
-              value={draft.body}
-              onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
+              value={draft.content}
+              onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}
               placeholder="Write the page content here…"
             />
           </div>

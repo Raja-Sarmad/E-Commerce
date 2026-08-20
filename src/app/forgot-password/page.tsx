@@ -6,10 +6,9 @@ import { FiArrowLeft, FiCheckCircle, FiMail } from "react-icons/fi";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { useToast } from "@/context/ToastProvider";
+import { toast } from "@/hooks/use-toast";
 
 export default function ForgotPasswordPage() {
-  const { success } = useToast();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,7 +20,7 @@ export default function ForgotPasswordPage() {
     await new Promise((resolve) => setTimeout(resolve, 800));
     setLoading(false);
     setSent(true);
-    success("Reset link sent", `Check your inbox at ${email}.`);
+    toast.success("Reset link sent", `Check your inbox at ${email}.`);
   };
 
   return (

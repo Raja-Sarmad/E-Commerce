@@ -27,9 +27,12 @@ function pad(n: number) {
 }
 
 export function FlashSale({ products }: FlashSaleProps) {
-  const [time, setTime] = useState(getTimeLeft);
+  const [mounted, setMounted] = useState(false);
+  const [time, setTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
+    setTime(getTimeLeft());
+    setMounted(true);
     const timer = setInterval(() => setTime(getTimeLeft()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -67,7 +70,7 @@ export function FlashSale({ products }: FlashSaleProps) {
                   <div key={unit.label} className="flex items-center gap-2">
                     <div className="flex min-w-[3.5rem] flex-col items-center rounded-xl bg-foreground px-3 py-2">
                       <span className="text-lg font-extrabold tabular-nums text-background">
-                        {pad(unit.value)}
+                        {mounted ? pad(unit.value) : "--"}
                       </span>
                       <span className="text-[10px] uppercase tracking-wide text-background/60">
                         {unit.label}

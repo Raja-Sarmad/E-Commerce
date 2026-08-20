@@ -2,21 +2,34 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   FiBarChart2,
   FiEye,
   FiHeart,
   FiShoppingBag,
-  FiCheck,
+  FiMinus,
+  FiPlus,
 } from "react-icons/fi";
+import { useSelector, useDispatch } from "react-redux";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { Rating } from "@/components/ui/Rating";
 import { Badge } from "@/components/ui/Badge";
-import { QuickView } from "./QuickView";
-import { useCart } from "@/context/CartProvider";
-import { useWishlist } from "@/context/WishlistProvider";
-import { useCompare } from "@/context/CompareProvider";
-import { useToast } from "@/context/ToastProvider";
+import { AuthRequiredModal } from "@/components/ui/AuthRequiredModal";
+const QuickView = dynamic(() => import("./QuickView").then((m) => m.QuickView), { ssr: false });
+import {
+  addItem,
+  updateQuantity,
+  removeItem,
+  selectCartItems,
+  selectIsInCart,
+  selectCartItemQuantity,
+} from "@/lib/rtk/cartSlice";
+import { toggleWishlist, selectIsInWishlist } from "@/lib/rtk/wishlistSlice";
+import { toggleCompare, selectIsInCompare } from "@/lib/rtk/compareSlice";
+import { toast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { formatPrice, getStockLabel } from "@/lib/utils";
 
@@ -26,43 +39,65 @@ type ProductCardProps = {
 };
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
-  const { addItem } = useCart();
-  const { isInWishlist, toggleWishlist } = useWishlist();
-  const { isInCompare, toggleCompare } = useCompare();
-  const { success, info } = useToast();
+  const dispatch = useDispatch();
+  const cartItems = useSelector(selectCartItems);
+  const inCart = useSelector(selectIsInCart(product.id));
+  const cartQuantity = useSelector(selectCartItemQuantity(product.id));
+  const wishlisted = useSelector(selectIsInWishlist(product.id));
+  const compared = useSelector(selectIsInCompare(product.id));
 
+  const { isAdmin } = useIsAdmin();
+  const { data: user } = useGetMeQuery();
   const [quickView, setQuickView] = useState(false);
-  const [added, setAdded] = useState(false);
-  const wishlisted = isInWishlist(product.id);
-  const compared = isInCompare(product.id);
-  const outOfStock = product.stock === 0;
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const outOfStock = (product.stock ?? 0) === 0;
+  const maxQuantity = Math.min(product.stock ?? 0, 99);
 
   const handleAddToCart = () => {
-    if (outOfStock) {
-      info("Out of stock", "This product is currently unavailable.");
+    if (!user) {
+      setShowAuthModal(true);
       return;
     }
-    addItem(product);
-    setAdded(true);
-    success("Added to cart", product.name);
-    setTimeout(() => setAdded(false), 1500);
+    if (outOfStock) {
+      toast.info("Out of stock", "This product is currently unavailable.");
+      return;
+    }
+    dispatch(addItem({ product }));
+    toast.success("Added to cart", product.name);
+  };
+
+  const handleDecrease = () => {
+    if (cartQuantity <= 1) {
+      dispatch(removeItem(product.id));
+      toast.info("Removed from cart", product.name);
+    } else {
+      dispatch(updateQuantity({ productId: product.id, quantity: cartQuantity - 1 }));
+    }
+  };
+
+  const handleIncrease = () => {
+    if (cartQuantity >= maxQuantity) {
+      toast.info("Max quantity reached", product.name);
+      return;
+    }
+    dispatch(updateQuantity({ productId: product.id, quantity: cartQuantity + 1 }));
   };
 
   const handleWishlist = () => {
-    toggleWishlist(product);
+    dispatch(toggleWishlist(product));
     if (!wishlisted) {
-      success("Added to wishlist", product.name);
+      toast.success("Added to wishlist", product.name);
     } else {
-      info("Removed from wishlist", product.name);
+      toast.info("Removed from wishlist", product.name);
     }
   };
 
   const handleCompare = () => {
-    toggleCompare(product);
+    dispatch(toggleCompare(product));
     if (!compared) {
-      success("Added to compare", product.name);
+      toast.success("Added to compare", product.name);
     } else {
-      info("Removed from compare", product.name);
+      toast.info("Removed from compare", product.name);
     }
   };
 
@@ -82,7 +117,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             className="block h-full w-full"
           >
             <ProductImage
-              src={product.images[0]}
+              src={product.images?.[0] ?? ""}
               alt={product.name}
               priority={priority}
               className="h-full w-full transition-transform duration-500 group-hover:scale-105"
@@ -107,23 +142,41 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           </div>
 
           <div className="absolute inset-x-3 bottom-3 flex translate-y-2 gap-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={outOfStock}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/90 py-2.5 text-sm font-semibold text-background backdrop-blur transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {added ? (
-                <>
-                  <FiCheck className="h-4 w-4" aria-hidden /> Added
-                </>
+            {!isAdmin && (
+              inCart ? (
+                <div className="flex flex-1 items-center justify-between rounded-xl bg-foreground/90 px-1 py-1 text-background backdrop-blur">
+                  <button
+                    type="button"
+                    onClick={handleDecrease}
+                    aria-label="Decrease quantity"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-background/15"
+                  >
+                    <FiMinus className="h-4 w-4" aria-hidden />
+                  </button>
+                  <span className="text-sm font-bold tabular-nums">
+                    {cartQuantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleIncrease}
+                    aria-label="Increase quantity"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-background/15"
+                  >
+                    <FiPlus className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
               ) : (
-                <>
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={outOfStock}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/90 py-2.5 text-sm font-semibold text-background backdrop-blur transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   <FiShoppingBag className="h-4 w-4" aria-hidden />
                   {outOfStock ? "Out of stock" : "Add to cart"}
-                </>
-              )}
-            </button>
+                </button>
+              )
+            )}
             <button
               type="button"
               onClick={() => setQuickView(true)}
@@ -209,6 +262,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
         open={quickView}
         onClose={() => setQuickView(false)}
       />
+      <AuthRequiredModal open={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </>
   );
 }

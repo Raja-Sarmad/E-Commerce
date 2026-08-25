@@ -7,6 +7,7 @@ import { makeStore, type AppStore, type AppDispatch } from "@/lib/rtk/store";
 import { queryClient } from "@/lib/tanstack/queryClient";
 import dynamic from "next/dynamic";
 import { hydrateCart } from "@/lib/rtk/cartSlice";
+import { hydrateAccessToken } from "@/lib/rtk/authSlice";
 
 const Toaster = dynamic(() => import("@/components/ui/Toaster").then((m) => m.Toaster), { ssr: false });
 import { hydrateWishlist } from "@/lib/rtk/wishlistSlice";
@@ -15,6 +16,7 @@ import { hydrateCompare } from "@/lib/rtk/compareSlice";
 function HydrateClientState() {
   const dispatch = useDispatch<AppDispatch>();
   useEffect(() => {
+    dispatch(hydrateAccessToken());
     dispatch(hydrateCart());
     dispatch(hydrateWishlist());
     dispatch(hydrateCompare());

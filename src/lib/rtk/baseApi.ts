@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError, type FetchBaseQueryMeta } from "@reduxjs/toolkit/query/react";
 import { API_URL } from "../api/config";
-import { clearAuthCookies } from "./authSlice";
+import { clearAuthCookies, setAccessToken } from "./authSlice";
+import type { RootState } from "./store";
 
 export type ApiEnvelope = {
   success: boolean;
@@ -14,6 +15,11 @@ export type ApiEnvelope = {
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_URL,
   credentials: "include",
+  prepareHeaders: (headers, { getState }) => {
+    const token = (getState() as RootState).auth.accessToken;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return headers;
+  },
 });
 
 const unwrapResponse = (result: { data?: ApiEnvelope | unknown }, meta?: unknown) => {
@@ -51,6 +57,11 @@ export const baseQueryWithReauth: BaseQueryFn<
 
   if (error) {
     return { error };
+  }
+
+  const envelope = (result as { data?: ApiEnvelope }).data;
+  if (envelope?.accessToken) {
+    api.dispatch(setAccessToken(envelope.accessToken));
   }
 
   return unwrapResponse(result as { data?: ApiEnvelope | unknown }, undefined);

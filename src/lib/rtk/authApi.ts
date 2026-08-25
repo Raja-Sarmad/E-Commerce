@@ -1,5 +1,5 @@
 import { baseApi } from "./baseApi";
-import { normalizeUser } from "./authSlice";
+import { normalizeUser, setUser } from "./authSlice";
 import type { Order, OrderStatus, OrderItem, User } from "../types";
 
 export type AuthResponse = User;
@@ -50,11 +50,33 @@ export const authApi = baseApi.injectEndpoints({
       query: (body) => ({ url: "/auth/login", method: "POST", body }),
       transformResponse: (raw: unknown) => normalizeUser(raw as Record<string, unknown>) as User,
       invalidatesTags: ["Auth"],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data: user } = await queryFulfilled;
+          if (user) {
+            dispatch(setUser(user));
+            dispatch(authApi.util.upsertQueryData("getMe", undefined, user));
+          }
+        } catch {
+          // login failed — no cache update
+        }
+      },
     }),
     register: builder.mutation<AuthResponse, RegisterPayload>({
       query: (body) => ({ url: "/auth/register", method: "POST", body }),
       transformResponse: (raw: unknown) => normalizeUser(raw as Record<string, unknown>) as User,
       invalidatesTags: ["Auth"],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data: user } = await queryFulfilled;
+          if (user) {
+            dispatch(setUser(user));
+            dispatch(authApi.util.upsertQueryData("getMe", undefined, user));
+          }
+        } catch {
+          // register failed — no cache update
+        }
+      },
     }),
     logout: builder.mutation<void, void>({
       query: () => ({ url: "/auth/logout", method: "POST" }),

@@ -23,14 +23,18 @@ export function normalizeUser(raw: Record<string, unknown> | null | undefined): 
   };
 }
 
+const ACCESS_TOKEN_KEY = "novamart_access_token";
+
 type AuthState = {
   user: User | null;
+  accessToken: string | null;
   isAuthenticated: boolean;
   hasHydrated: boolean;
 };
 
 const initialState: AuthState = {
   user: null,
+  accessToken: null,
   isAuthenticated: false,
   hasHydrated: false,
 };
@@ -44,16 +48,31 @@ const authSlice = createSlice({
       state.isAuthenticated = !!action.payload;
       state.hasHydrated = true;
     },
+    setAccessToken: (state, action: PayloadAction<string | null>) => {
+      state.accessToken = action.payload;
+      if (typeof window !== "undefined") {
+        if (action.payload) sessionStorage.setItem(ACCESS_TOKEN_KEY, action.payload);
+        else sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      }
+    },
+    hydrateAccessToken: (state) => {
+      if (typeof window === "undefined") return;
+      state.accessToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    },
     setHydrated: (state) => {
       state.hasHydrated = true;
     },
     clearAuthCookies: (state) => {
       state.user = null;
+      state.accessToken = null;
       state.isAuthenticated = false;
       state.hasHydrated = true;
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      }
     },
   },
 });
 
-export const { setUser, setHydrated, clearAuthCookies } = authSlice.actions;
+export const { setUser, setAccessToken, hydrateAccessToken, setHydrated, clearAuthCookies } = authSlice.actions;
 export default authSlice.reducer;

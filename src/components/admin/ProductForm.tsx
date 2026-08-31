@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   FiLink,
@@ -130,9 +130,9 @@ type ProductFormProps = {
 const emptyForm = {
   name: "",
   slug: "",
-  brand: "Sonix",
-  category: "Electronics",
-  categorySlug: "electronics",
+  brand: "",
+  category: "",
+  categorySlug: "",
   description: "",
   features: [] as string[],
   price: "",
@@ -143,7 +143,7 @@ const emptyForm = {
   colors: [] as string[],
   sizes: [] as string[],
   position: "",
-  isFeatured: false,
+  isFeatured: true,
   isBestSeller: false,
   isNew: true,
   isTrending: false,
@@ -196,6 +196,19 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (mode !== "create" || initial || categories.length === 0) return;
+    setForm((prev) => {
+      if (prev.category) return prev;
+      const first = categories[0];
+      return {
+        ...prev,
+        category: first.name,
+        categorySlug: first.slug,
+      };
+    });
+  }, [categories, mode, initial]);
+
   const set = <K extends keyof typeof emptyForm>(
     key: K,
     value: (typeof emptyForm)[K]
@@ -218,7 +231,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
 
   const validate = () => {
     const errors: Record<string, string> = {};
-    if (!form.name.trim()) errors.name = "Product name is required.";
+    if (!form.category.trim()) errors.category = "Select a category.";
     if (!form.price.trim() || Number(form.price) <= 0)
       errors.price = "Enter a valid price greater than 0.";
     if (!form.sku.trim()) errors.sku = "SKU is required.";
@@ -254,6 +267,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     formData.append("isNew", String(form.isNew));
     formData.append("isTrending", String(form.isTrending));
     formData.append("onSale", String(form.onSale));
+    formData.append("isActive", "true");
 
     form.features.forEach((f) => formData.append("features", f));
     form.tags.forEach((t) => formData.append("tags", t));

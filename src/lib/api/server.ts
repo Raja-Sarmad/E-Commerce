@@ -73,33 +73,46 @@ export async function getProducts(query: ProductQuery = {}): Promise<ProductList
   };
 }
 
-async function getFlagged(slug: ProductQuery["categorySlug"], extra: Partial<ProductQuery>): Promise<Product[]> {
-  const res = await getProducts({ ...extra, limit: 8 });
+async function getFlagged(extra: Partial<ProductQuery>, limit = 8): Promise<Product[]> {
+  const res = await getProducts({ ...extra, limit });
   return res.products;
 }
 
+/** Use flagged products when available; otherwise show latest active catalog items. */
+async function getFlaggedOrLatest(
+  flags: Partial<ProductQuery>,
+  fallbackSort = "-createdAt"
+): Promise<Product[]> {
+  const flagged = await getFlagged(flags);
+  if (flagged.length > 0) return flagged;
+  const latest = await getProducts({ sort: fallbackSort, limit: 8 });
+  return latest.products;
+}
+
 export async function getFeaturedProducts(): Promise<Product[]> {
-  return getFlagged("", { featured: true });
+  return getFlaggedOrLatest({ featured: true });
 }
 
 export async function getBestSellers(): Promise<Product[]> {
-  return getFlagged("", { bestSeller: true });
+  return getFlaggedOrLatest({ bestSeller: true });
 }
 
 export async function getNewArrivals(): Promise<Product[]> {
-  return getFlagged("", { sort: "createdAt" });
+  return getProducts({ sort: "-createdAt", limit: 8 }).then((r) => r.products);
 }
 
 export async function getTrendingProducts(): Promise<Product[]> {
-  return getFlagged("", { trending: true });
+  return getFlaggedOrLatest({ trending: true });
 }
 
 export async function getFlashSaleProducts(): Promise<Product[]> {
-  return getFlagged("", { onSale: true, sort: "-discountPercent" });
+  const onSale = await getFlagged({ onSale: true, sort: "-discountPercent" });
+  if (onSale.length > 0) return onSale;
+  return getProducts({ sort: "-createdAt", limit: 8 }).then((r) => r.products);
 }
 
 export async function getRecommendedProducts(): Promise<Product[]> {
-  return getFlagged("", { sort: "rating" });
+  return getProducts({ sort: "-rating", limit: 8 }).then((r) => r.products);
 }
 
 export type ProductDetail = Product & { related: Product[] };

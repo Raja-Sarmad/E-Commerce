@@ -76,7 +76,7 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
 }
 
 export const apiGet = <T>(path: string, init: FetchOptions = {}) =>
-  apiFetch<T>(path, { ...init, method: "GET", next: { revalidate: 300 } });
+  apiFetch<T>(path, { ...init, method: "GET", cache: "no-store" });
 
 export const apiPost = <T>(path: string, body?: unknown, init: FetchOptions = {}) =>
   apiFetch<T>(path, {

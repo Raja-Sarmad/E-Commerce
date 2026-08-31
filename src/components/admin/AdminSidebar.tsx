@@ -34,8 +34,6 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { cn } from "@/lib/utils";
-import { notifications } from "@/lib/data/admin";
-import { contactMessages } from "@/lib/data/admin";
 
 type NavItem = {
   label: string;
@@ -67,13 +65,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Sales",
     items: [
-      {
-        label: "Orders",
-        href: "/admin/orders",
-        icon: FiShoppingBag,
-        badge: 4,
-        badgeVariant: "primary",
-      },
+      { label: "Orders", href: "/admin/orders", icon: FiShoppingBag },
       { label: "Payments", href: "/admin/payments", icon: FiCreditCard },
       { label: "Shipping", href: "/admin/shipping", icon: FiTruck },
       { label: "Coupons", href: "/admin/coupons", icon: FiTag },
@@ -83,20 +75,8 @@ const navGroups: NavGroup[] = [
     label: "Management",
     items: [
       { label: "Customers", href: "/admin/customers", icon: FiUsers },
-      {
-        label: "Vendors",
-        href: "/admin/vendors",
-        icon: FiUserCheck,
-        badge: 2,
-        badgeVariant: "warning",
-      },
-      {
-        label: "Inventory",
-        href: "/admin/inventory",
-        icon: FiPackage,
-        badge: 3,
-        badgeVariant: "destructive",
-      },
+      { label: "Vendors", href: "/admin/vendors", icon: FiUserCheck },
+      { label: "Inventory", href: "/admin/inventory", icon: FiPackage },
       { label: "Reviews", href: "/admin/reviews", icon: FiStar },
     ],
   },
@@ -113,20 +93,8 @@ const navGroups: NavGroup[] = [
     label: "Engagement",
     items: [
       { label: "Newsletter", href: "/admin/newsletter", icon: FiMail },
-      {
-        label: "Messages",
-        href: "/admin/messages",
-        icon: FiMessageSquare,
-        badge: contactMessages.filter((m) => m.status === "unread").length,
-        badgeVariant: "destructive",
-      },
-      {
-        label: "Notifications",
-        href: "/admin/notifications",
-        icon: FiBell,
-        badge: notifications.filter((n) => !n.read).length,
-        badgeVariant: "primary",
-      },
+      { label: "Messages", href: "/admin/messages", icon: FiMessageSquare },
+      { label: "Notifications", href: "/admin/notifications", icon: FiBell },
     ],
   },
   {

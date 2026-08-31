@@ -5,14 +5,13 @@ import { Container } from "@/components/ui/Container";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { useGetStorefrontCategoriesQuery } from "@/lib/rtk/storefrontApi";
-import { categories as staticCategories } from "@/lib/data/categories";
 
 export function CategoryShowcase() {
-  const { data: apiCategories = [], isLoading } = useGetStorefrontCategoriesQuery();
+  const { data: categories = [], isLoading } = useGetStorefrontCategoriesQuery();
 
-  // Use live API data if available, otherwise fall back to static data
-  const categories =
-    apiCategories.length > 0 ? apiCategories : staticCategories;
+  if (!isLoading && categories.length === 0) {
+    return null;
+  }
 
   return (
     <section aria-labelledby="categories-heading" className="py-12 sm:py-16">
@@ -27,10 +26,7 @@ export function CategoryShowcase() {
         {isLoading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="skeleton aspect-square rounded-2xl"
-              />
+              <div key={i} className="skeleton aspect-square rounded-2xl" />
             ))}
           </div>
         ) : (

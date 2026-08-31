@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/Button";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { useGetMyOrdersQuery } from "@/lib/rtk/authApi";
 import { readOrderByNumber } from "@/lib/orders-store";
-import { sampleOrders } from "@/lib/data/content";
 import { formatPrice, formatDate } from "@/lib/utils";
 
 function OrderSuccessInner() {
@@ -25,8 +24,7 @@ function OrderSuccessInner() {
   const { data: orders = [] } = useGetMyOrdersQuery(undefined, { skip: !isAuthenticated });
   const order =
     orders.find((o) => o.number === number) ??
-    readOrderByNumber(number) ??
-    sampleOrders.find((o) => o.number === number);
+    readOrderByNumber(number);
 
   return (
     <Container className="flex min-h-[60vh] items-center justify-center py-10">

@@ -34,6 +34,7 @@ export function ShopToolbar({ total, showingFrom, showingTo }: ShopToolbarProps)
   const reverseSortMap: Record<string, string> = {
     "": "position",
     createdAt: "newest",
+    "-createdAt": "newest",
     price: "price-asc",
     "-price": "price-desc",
     "-rating": "rating",
@@ -44,7 +45,7 @@ export function ShopToolbar({ total, showingFrom, showingTo }: ShopToolbarProps)
 
   const sortMap: Record<string, string> = {
     position: "",
-    newest: "createdAt",
+    newest: "-createdAt",
     "price-asc": "price",
     "price-desc": "-price",
     rating: "-rating",

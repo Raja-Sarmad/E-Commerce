@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import {
   FiCalendar,
@@ -13,15 +12,14 @@ import {
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { useGetMeQuery } from "@/lib/rtk/authApi";
+import { useGetMeQuery, useGetMyOrdersQuery } from "@/lib/rtk/authApi";
 import { formatDate, formatPrice } from "@/lib/utils";
-import { readOrders } from "@/lib/orders-store";
-import { sampleOrders } from "@/lib/data/content";
 
 export default function ProfilePage() {
   const { data: user } = useGetMeQuery();
+  const { data: orders = [] } = useGetMyOrdersQuery(undefined, { skip: !user });
 
-  const recentOrders = [...readOrders(), ...sampleOrders]
+  const recentOrders = [...orders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3);
 
@@ -46,7 +44,7 @@ export default function ProfilePage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Orders placed", value: String(readOrders().length) },
+          { label: "Orders placed", value: String(orders.length) },
           { label: "In wishlist", value: "—" },
           { label: "Account type", value: user.role === "admin" ? "Admin" : "Customer" },
             { label: "Member since", value: formatDate(user.joinedAt) },

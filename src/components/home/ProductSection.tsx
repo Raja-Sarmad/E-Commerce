@@ -22,6 +22,8 @@ export function ProductSection({
   linkHref,
   columns = 4,
 }: ProductSectionProps) {
+  if (products.length === 0) return null;
+
   const gridCols =
     columns === 4
       ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"

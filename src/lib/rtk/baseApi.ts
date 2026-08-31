@@ -25,9 +25,12 @@ const rawBaseQuery = fetchBaseQuery({
 const unwrapResponse = (result: { data?: ApiEnvelope | unknown }, meta?: unknown) => {
   const envelope = result.data as ApiEnvelope | undefined;
   if (envelope && typeof envelope === "object" && "success" in envelope) {
-    return { data: envelope.data as never, meta: envelope.meta as never };
+    return {
+      data: (envelope.data ?? null) as never,
+      meta: (envelope.meta ?? undefined) as never,
+    };
   }
-  return { data: result.data as never, meta: meta as never };
+  return { data: (result.data ?? null) as never, meta: meta as never };
 };
 
 export const baseQueryWithReauth: BaseQueryFn<

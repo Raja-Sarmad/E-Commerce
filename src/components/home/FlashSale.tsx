@@ -30,6 +30,8 @@ export function FlashSale({ products }: FlashSaleProps) {
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
+  if (products.length === 0) return null;
+
   useEffect(() => {
     setTime(getTimeLeft());
     setMounted(true);

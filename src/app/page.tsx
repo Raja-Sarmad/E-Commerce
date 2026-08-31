@@ -5,7 +5,6 @@ import { ProductSection } from "@/components/home/ProductSection";
 import { FlashSale } from "@/components/home/FlashSale";
 import { PromoBanner } from "@/components/home/PromoBanner";
 import { BrandShowcase } from "@/components/home/BrandShowcase";
-import { Testimonials } from "@/components/home/Testimonials";
 import {
   getFeaturedProducts,
   getBestSellers,
@@ -15,7 +14,7 @@ import {
   getRecommendedProducts,
 } from "@/lib/api/server";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Premium Shopping, Delivered",
@@ -79,7 +78,6 @@ export default async function HomePage() {
         linkLabel="View trends"
         linkHref="/shop"
       />
-      <Testimonials />
       <ProductSection
         badge="Top rated"
         title="Recommended for you"

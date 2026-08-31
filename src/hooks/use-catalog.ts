@@ -63,7 +63,7 @@ export function useBestSellers() {
 export function useNewArrivals() {
   return useQuery<Product[]>({
     queryKey: ["products", "new-arrivals"],
-    queryFn: () => getProducts({ sort: "createdAt", limit: 8 }).then((r) => r.products),
+    queryFn: () => getProducts({ sort: "-createdAt", limit: 8 }).then((r) => r.products),
   });
 }
 
@@ -84,7 +84,7 @@ export function useFlashSaleProducts() {
 export function useRecommendedProducts() {
   return useQuery<Product[]>({
     queryKey: ["products", "recommended"],
-    queryFn: () => getProducts({ sort: "rating", limit: 8 }).then((r) => r.products),
+    queryFn: () => getProducts({ sort: "-rating", limit: 8 }).then((r) => r.products),
   });
 }
 

@@ -155,18 +155,18 @@ export const adminApi = baseApi.injectEndpoints({
         const form = body instanceof FormData ? body : undefined;
         return { url: "/products/admin", method: "POST", body: form ?? body };
       },
-      invalidatesTags: ["Products", "Dashboard"],
+      invalidatesTags: ["Products", "Dashboard", "Categories", "Brands"],
     }),
     updateProduct: builder.mutation<Product, { id: string; body: ProductPayload }>({
       query: ({ id, body }) => {
         const form = body instanceof FormData ? body : undefined;
         return { url: `/products/admin/${id}`, method: "PATCH", body: form ?? body };
       },
-      invalidatesTags: ["Products", "Product", "Dashboard"],
+      invalidatesTags: ["Products", "Product", "Dashboard", "Categories", "Brands"],
     }),
     deleteProduct: builder.mutation<unknown, string>({
       query: (id) => ({ url: `/products/admin/${id}`, method: "DELETE" }),
-      invalidatesTags: ["Products", "Dashboard"],
+      invalidatesTags: ["Products", "Dashboard", "Categories"],
     }),
 
     /* ── Orders ────────────────────────────────────────────────── */

@@ -57,6 +57,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Catalog",
     items: [
+      { label: "Catalog overview", href: "/admin/catalog", icon: FiShoppingBag, end: true },
       { label: "Products", href: "/admin/products", icon: FiBox },
       { label: "Categories", href: "/admin/categories", icon: FiGrid },
       { label: "Brands", href: "/admin/brands", icon: FiAward },

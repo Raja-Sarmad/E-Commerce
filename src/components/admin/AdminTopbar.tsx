@@ -187,11 +187,12 @@ export function AdminTopbar({
       <div className="hidden min-w-0 md:block">
         <p className="truncate text-sm font-bold text-foreground">{currentPage}</p>
         <Link
-          href="/"
+          href="/shop"
+          target="_blank"
           className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary"
         >
-          <FiHome className="h-3 w-3" aria-hidden />
-          NovaMart storefront
+          <FiExternalLink className="h-3 w-3" aria-hidden />
+          View catalog
         </Link>
       </div>
 
@@ -219,6 +220,7 @@ export function AdminTopbar({
               </div>
               <ul className="p-1.5">
                 {[
+                  { href: "/admin/catalog", icon: <FiShoppingBag className="h-4 w-4" aria-hidden />, title: "Catalog" },
                   { href: "/admin/products", icon: <FiBox className="h-4 w-4" aria-hidden />, title: "Products" },
                   { href: "/admin/orders", icon: <FiShoppingBag className="h-4 w-4" aria-hidden />, title: "Orders" },
                   { href: "/admin/customers", icon: <FiUsers className="h-4 w-4" aria-hidden />, title: "Customers" },
@@ -574,6 +576,7 @@ function navTitle(pathname: string): string {
   const segment = pathname.replace("/admin/", "").split("/")[0];
   if (!segment) return "Dashboard";
   const map: Record<string, string> = {
+    catalog: "Catalog",
     products: "Products",
     categories: "Categories",
     brands: "Brands",

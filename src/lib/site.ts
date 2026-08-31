@@ -22,7 +22,7 @@ export const siteConfig = {
 
 export const navLinks = [
   { label: "Home", href: "/" },
-  { label: "Shop", href: "/shop" },
+  { label: "Catalog", href: "/shop" },
   { label: "Categories", href: "/categories" },
   { label: "Blog", href: "/blog" },
   { label: "About", href: "/about" },

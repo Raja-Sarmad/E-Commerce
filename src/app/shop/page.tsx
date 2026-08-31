@@ -73,10 +73,10 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
   return (
     <Container className="py-6">
-      <Breadcrumb items={[{ label: "Shop", href: "/shop" }, ...(category ? [{ label: category.name }] : [])]} />
+      <Breadcrumb items={[{ label: "Catalog", href: "/shop" }, ...(category ? [{ label: category.name }] : [])]} />
       <div className="mb-8">
         <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
-          {category ? category.name : "All Products"}
+          {category ? category.name : "Catalog"}
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
           {category

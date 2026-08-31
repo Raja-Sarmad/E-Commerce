@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+  FiGrid,
   FiLink,
   FiPlus,
   FiSave,
@@ -14,12 +15,13 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { toast } from "@/hooks/use-toast";
-import { useCategories } from "@/hooks/use-catalog";
 import {
   useCreateProductMutation,
   useUpdateProductMutation,
+  useGetAdminCategoriesQuery,
 } from "@/lib/rtk/adminApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { slugify, formatPrice } from "@/lib/utils";
@@ -152,7 +154,8 @@ const emptyForm = {
 
 export function ProductForm({ initial, mode }: ProductFormProps) {
   const router = useRouter();
-  const { data: categories = [] } = useCategories();
+  const { data: categoryData, isLoading: categoriesLoading } = useGetAdminCategoriesQuery({});
+  const categories = categoryData?.items ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [createProduct] = useCreateProductMutation();
   const [updateProduct] = useUpdateProductMutation();
@@ -199,7 +202,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
   useEffect(() => {
     if (mode !== "create" || initial || categories.length === 0) return;
     setForm((prev) => {
-      if (prev.category) return prev;
+      if (prev.categorySlug) return prev;
       const first = categories[0];
       return {
         ...prev,
@@ -223,11 +226,16 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     }
   };
 
-  const selectCategory = (name: string) => {
-    const cat = categories.find((c) => c.name === name);
-    set("category", name);
-    set("categorySlug", cat?.slug ?? slugify(name));
+  const selectCategoryBySlug = (slug: string) => {
+    const cat = categories.find((c) => c.slug === slug);
+    if (!cat) return;
+    set("category", cat.name);
+    set("categorySlug", cat.slug);
   };
+
+  const hasCurrentCategory =
+    !form.categorySlug ||
+    categories.some((c) => c.slug === form.categorySlug);
 
   const validate = () => {
     const errors: Record<string, string> = {};
@@ -375,22 +383,53 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             placeholder="e.g. Sonix, TechOne, or your own brand"
           />
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Category</label>
-            <input
-              list="category-list"
-              value={form.category}
-              onChange={(e) => {
-                selectCategory(e.target.value);
-              }}
-              placeholder="e.g. Electronics, Fashion, Home & Living"
-              className="flex h-10 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-            <datalist id="category-list">
-              {categories.map((c) => (
-                <option key={c.id} value={c.name} />
-              ))}
-            </datalist>
-            <p className="text-xs text-muted-foreground">Type a new category or pick from suggestions.</p>
+            {categories.length === 0 && !categoriesLoading ? (
+              <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
+                <p className="text-sm font-medium text-foreground">No categories yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Create a category first, then assign your product to it.
+                </p>
+                <Button
+                  href="/admin/categories"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  leftIcon={<FiPlus className="h-4 w-4" aria-hidden />}
+                >
+                  Add category
+                </Button>
+              </div>
+            ) : (
+              <Select
+                label="Category"
+                value={form.categorySlug}
+                onChange={(e) => selectCategoryBySlug(e.target.value)}
+                error={fieldErrors.category}
+                hint={
+                  categoriesLoading
+                    ? "Loading categories..."
+                    : `${categories.length} categor${categories.length === 1 ? "y" : "ies"} available`
+                }
+                leftIcon={<FiGrid className="h-4 w-4" aria-hidden />}
+                disabled={categoriesLoading || categories.length === 0}
+              >
+                <option value="" disabled>
+                  Select a category
+                </option>
+                {!hasCurrentCategory && form.categorySlug && (
+                  <option value={form.categorySlug}>
+                    {form.category} (current)
+                  </option>
+                )}
+                {categories.map((c) => (
+                  <option key={c._id} value={c.slug}>
+                    {c.name}
+                    {!c.isActive ? " (inactive)" : ""}
+                    {typeof c.count === "number" ? ` · ${c.count} product${c.count === 1 ? "" : "s"}` : ""}
+                  </option>
+                ))}
+              </Select>
+            )}
           </div>
           <Textarea
             label="Description"

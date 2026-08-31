@@ -65,7 +65,11 @@ function buildQs(params: Record<string, string | number | undefined>): string {
   return qs.toString() ? `?${qs.toString()}` : "";
 }
 
-function parseListResponse<T>(raw: unknown, mapId = false): ListResponse<T> {
+function parseListResponse<T>(
+  raw: unknown,
+  responseMeta?: unknown,
+  mapId = false
+): ListResponse<T> {
   const envelope = raw as {
     data?: unknown;
     meta?: { page?: number; limit?: number; total?: number; totalPages?: number };
@@ -79,7 +83,9 @@ function parseListResponse<T>(raw: unknown, mapId = false): ListResponse<T> {
         return { ...rest, id: String(_id ?? row.id ?? "") } as T;
       })
     : rows) as T[];
-  const meta = envelope?.meta;
+  const meta =
+    (envelope?.meta as typeof envelope.meta | undefined) ??
+    (responseMeta as typeof envelope.meta | undefined);
   const total = meta?.total ?? items.length;
   const page = meta?.page ?? 1;
   const limit = meta?.limit ?? (items.length || 1);
@@ -187,7 +193,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Orders ────────────────────────────────────────────────── */
     getOrders: builder.query<ListResponse<Order>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/orders/admin/list${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => parseListResponse<Order>(raw, true),
+      transformResponse: (raw: unknown, meta) => parseListResponse<Order>(raw, meta, true),
       providesTags: ["Orders"],
     }),
     getOrderDetail: builder.query<Record<string, unknown>, string>({
@@ -207,7 +213,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Users / Customers ─────────────────────────────────────── */
     getUsers: builder.query<ListResponse<User>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/users${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => parseListResponse<User>(raw, true),
+      transformResponse: (raw: unknown, meta) => parseListResponse<User>(raw, meta, true),
       providesTags: ["Users"],
     }),
     deleteUser: builder.mutation<unknown, string>({
@@ -596,7 +602,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Logs ──────────────────────────────────────────────────── */
     getAdminLogs: builder.query<ListResponse<AdminLog>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/logs${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => parseListResponse<AdminLog>(raw),
+      transformResponse: (raw: unknown, meta) => parseListResponse<AdminLog>(raw, meta),
       providesTags: ["Settings"],
     }),
     clearLogs: builder.mutation<unknown, void>({

@@ -34,6 +34,7 @@ import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { formatPrice, getStockLabel } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useLiveStockMap } from "@/components/product/LiveStockProvider";
 
 type ProductDetailsProps = {
   product: Product;
@@ -55,8 +56,12 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const [added, setAdded] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const outOfStock = product.stock === 0;
-  const maxQuantity = Math.max(0, product.stock ?? 0);
+  const { data: stockMap = {} } = useLiveStockMap([product.id]);
+  const liveStock = stockMap[product.id] ?? product.stock ?? 0;
+  const liveProduct = { ...product, stock: liveStock };
+
+  const outOfStock = liveStock === 0;
+  const maxQuantity = Math.max(0, liveStock);
   const discount = product.compareAtPrice
     ? Math.round(
         ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100
@@ -74,7 +79,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     }
     const check = validateCartQuantity(
       cartItems,
-      product,
+      liveProduct,
       qty,
       inCart ? "set" : "add",
       color,
@@ -88,7 +93,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       dispatch(updateQuantity({ productId: product.id, quantity: qty }));
       toast.success("Cart updated", `${qty} × ${product.name}`);
     } else {
-      dispatch(addItem({ product, quantity: qty, color, size }));
+      dispatch(addItem({ product: liveProduct, quantity: qty, color, size }));
       setAdded(true);
       toast.success("Added to cart", `${qty} × ${product.name}`);
       setTimeout(() => setAdded(false), 1500);
@@ -170,7 +175,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           "flex items-center gap-2 text-sm font-semibold",
           outOfStock
             ? "text-destructive"
-            : product.stock <= 10
+            : liveStock <= 10
               ? "text-warning"
               : "text-success"
         )}
@@ -180,12 +185,12 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             "inline-block h-2.5 w-2.5 rounded-full",
             outOfStock
               ? "bg-destructive"
-              : product.stock <= 10
+              : liveStock <= 10
                 ? "bg-warning"
                 : "bg-success"
           )}
         />
-        {getStockLabel(product)}
+        {getStockLabel(liveProduct)}
       </p>
 
       <p className="text-sm leading-relaxed text-muted-foreground">

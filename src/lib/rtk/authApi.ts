@@ -109,7 +109,7 @@ export const authApi = baseApi.injectEndpoints({
     createOrder: builder.mutation<Order, Record<string, unknown>>({
       query: (body) => ({ url: "/orders", method: "POST", body }),
       transformResponse: (raw: unknown) => normalizeOrder(raw as Record<string, unknown>),
-      invalidatesTags: ["Orders", "Dashboard"],
+      invalidatesTags: ["Orders", "Dashboard", "Products"],
     }),
   }),
 });

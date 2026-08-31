@@ -1,6 +1,7 @@
 import { Container } from "@/components/ui/Container";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ProductCard } from "@/components/product/ProductCard";
+import { LiveStockProvider } from "@/components/product/LiveStockProvider";
 import type { Product } from "@/lib/types";
 
 type ProductSectionProps = {
@@ -40,9 +41,11 @@ export function ProductSection({
           linkHref={linkHref}
         />
         <div className={`grid gap-4 sm:gap-5 ${gridCols}`}>
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+          <LiveStockProvider productIds={products.map((product) => product.id)}>
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </LiveStockProvider>
         </div>
       </Container>
     </section>

@@ -5,7 +5,7 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { LinkPagination as Pagination } from "@/components/ui/LinkPagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
-import { ProductCard } from "@/components/product/ProductCard";
+import { ProductGrid } from "@/components/product/ProductGrid";
 import { FilterSidebar } from "@/components/shop/FilterSidebar";
 import { ShopToolbar } from "@/components/shop/ShopToolbar";
 import { getProducts, getCategories, getCategoryBySlug } from "@/lib/api/server";
@@ -105,11 +105,10 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 xl:grid-cols-4">
-                {pageItems.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              <ProductGrid
+                products={pageItems}
+                className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 xl:grid-cols-4"
+              />
               <Pagination
                 page={page}
                 totalPages={totalPages}

@@ -33,6 +33,7 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { formatPrice, getStockLabel } from "@/lib/utils";
+import { useLiveStock } from "@/components/product/LiveStockProvider";
 
 type ProductCardProps = {
   product: Product;
@@ -51,7 +52,9 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const { data: user } = useGetMeQuery();
   const [quickView, setQuickView] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const outOfStock = (product.stock ?? 0) === 0;
+  const liveStock = useLiveStock(product.id, product.stock ?? 0);
+  const liveProduct = { ...product, stock: liveStock };
+  const outOfStock = liveStock === 0;
 
   const handleAddToCart = () => {
     if (!user) {
@@ -62,12 +65,12 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
       toast.warning("No stock available", "This product is currently out of stock.");
       return;
     }
-    const check = validateCartQuantity(cartItems, product, 1, "add");
+    const check = validateCartQuantity(cartItems, liveProduct, 1, "add");
     if (!check.ok) {
       toast.warning(check.title, check.message);
       return;
     }
-    dispatch(addItem({ product }));
+    dispatch(addItem({ product: liveProduct }));
     toast.success("Added to cart", product.name);
   };
 
@@ -83,7 +86,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const handleIncrease = () => {
     const check = validateCartQuantity(
       cartItems,
-      product,
+      liveProduct,
       cartQuantity + 1,
       "set"
     );
@@ -145,7 +148,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
                 <Badge variant="accent">Best Seller</Badge>
               )}
             </div>
-            {product.stock <= 10 && product.stock > 0 && (
+            {liveStock <= 10 && liveStock > 0 && (
               <Badge variant="warning" dot>
                 Low stock
               </Badge>
@@ -235,12 +238,12 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
               className={`text-xs font-semibold ${
                 outOfStock
                   ? "text-destructive"
-                  : product.stock <= 10
+                  : liveStock <= 10
                     ? "text-warning"
                     : "text-success"
               }`}
             >
-              {getStockLabel(product)}
+              {getStockLabel(liveProduct)}
             </span>
           </div>
 

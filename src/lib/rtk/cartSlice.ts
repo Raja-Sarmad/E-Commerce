@@ -167,6 +167,22 @@ const cartSlice = createSlice({
     removeCoupon: (state) => {
       state.coupon = null;
     },
+    syncCartStock: (state, action: PayloadAction<Record<string, number>>) => {
+      const stockMap = action.payload;
+      state.items = state.items
+        .map((item) => {
+          const live = stockMap[item.product.id];
+          if (live === undefined) return item;
+          const stock = Math.max(0, live);
+          return {
+            ...item,
+            product: { ...item.product, stock },
+            quantity: Math.min(item.quantity, stock),
+          };
+        })
+        .filter((item) => item.quantity > 0);
+      writeStorage(state.items);
+    },
   },
 });
 
@@ -178,6 +194,7 @@ export const {
   clearCart,
   applyCoupon,
   removeCoupon,
+  syncCartStock,
 } = cartSlice.actions;
 
 export default cartSlice.reducer;

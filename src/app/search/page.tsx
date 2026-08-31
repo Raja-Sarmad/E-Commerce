@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { ProductCard } from "@/components/product/ProductCard";
+import { ProductGrid } from "@/components/product/ProductGrid";
 import { LinkPagination as Pagination } from "@/components/ui/LinkPagination";
 import { searchProducts } from "@/lib/api/server";
 import { filterAndSortProducts, paginate } from "@/lib/filter";
@@ -67,11 +67,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-            {items.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          <ProductGrid
+            products={items}
+            className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4"
+          />
           <Pagination
             page={page}
             totalPages={totalPages}

@@ -35,6 +35,7 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 import { siteConfig } from "@/lib/site";
 import { formatPrice, cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useSyncCartStock } from "@/hooks/use-sync-cart-stock";
 
 export default function CartPage() {
   const dispatch = useDispatch();
@@ -45,6 +46,8 @@ export default function CartPage() {
   const coupon = useSelector(selectCartCoupon);
   const [validateCoupon] = useValidateCouponMutation();
   const [code, setCode] = useState("");
+
+  useSyncCartStock({ notify: true });
 
   const freeShippingLeft = Math.max(0, siteConfig.freeShippingThreshold - (subtotal - discount));
   const progress = Math.min(100, ((subtotal - discount) / siteConfig.freeShippingThreshold) * 100);

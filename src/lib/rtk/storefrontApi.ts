@@ -372,6 +372,28 @@ export const storefrontApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Coupons"],
     }),
+
+    getProductStock: builder.query<Record<string, number>, string[]>({
+      query: (ids) => {
+        const unique = [...new Set(ids.filter(Boolean))];
+        return { url: `/products/stock?ids=${unique.join(",")}` };
+      },
+      transformResponse: (raw: unknown) => {
+        const envelope = raw as { data?: unknown };
+        const rows = Array.isArray(envelope?.data)
+          ? (envelope.data as Array<{ id?: string; _id?: string; stock?: number }>)
+          : Array.isArray(raw)
+            ? (raw as Array<{ id?: string; _id?: string; stock?: number }>)
+            : [];
+        return Object.fromEntries(
+          rows.map((row) => [
+            String(row.id ?? row._id ?? ""),
+            Math.max(0, Number(row.stock ?? 0)),
+          ])
+        );
+      },
+      keepUnusedDataFor: 0,
+    }),
   }),
 });
 
@@ -394,4 +416,5 @@ export const {
   useSubmitContactMessageMutation,
   useSubscribeNewsletterMutation,
   useValidateCouponMutation,
+  useGetProductStockQuery,
 } = storefrontApi;

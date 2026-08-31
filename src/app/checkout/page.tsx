@@ -32,10 +32,14 @@ import { toast } from "@/hooks/use-toast";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useCreateOrderMutation } from "@/lib/rtk/authApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
-import { saveOrder, generateOrderNumber } from "@/lib/orders-store";
-import type { Address, Order } from "@/lib/types";
+import type { Address } from "@/lib/types";
 import { siteConfig } from "@/lib/site";
 import { formatPrice, cn } from "@/lib/utils";
+import {
+  useSyncCartStock,
+  validateCartStockBeforeCheckout,
+} from "@/hooks/use-sync-cart-stock";
+import { syncCartStock } from "@/lib/rtk/cartSlice";
 
 type DeliveryOption = {
   id: string;
@@ -89,6 +93,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [cardDetails, setCardDetails] = useState({ number: "", name: "", expiry: "", cvc: "" });
   const [processing, setProcessing] = useState(false);
+  const { refetch: refetchStock } = useSyncCartStock();
 
   const delivery = deliveryOptions.find((d) => d.id === deliveryId) ?? deliveryOptions[0];
   const totalWithDelivery = total + delivery.price;
@@ -151,6 +156,20 @@ export default function CheckoutPage() {
     if (!cardValid) return;
     setProcessing(true);
 
+    const fresh = await refetchStock();
+    const stockMap = fresh.data;
+    if (stockMap) {
+      dispatch(syncCartStock(stockMap));
+    }
+
+    const stockCheck = validateCartStockBeforeCheckout(items, stockMap);
+    if (!stockCheck.ok) {
+      toast.error("Stock unavailable", stockCheck.message);
+      setProcessing(false);
+      router.push("/cart");
+      return;
+    }
+
     const payload = {
       items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
       couponCode: coupon?.code ?? undefined,
@@ -172,57 +191,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    const orderNumber = generateOrderNumber();
-    const now = new Date();
-    const eta = new Date(now);
-    eta.setDate(eta.getDate() + (delivery.id === "nextday" ? 1 : delivery.id === "express" ? 3 : 7));
-
-    const order: Order = {
-      id: `od-${Date.now()}`,
-      number: orderNumber,
-      items: items.map((i) => ({
-        productId: i.product.id,
-        name: i.product.name,
-        image: i.product.images?.[0] ?? "",
-        price: i.product.price,
-        quantity: i.quantity,
-      })),
-      subtotal,
-      discount,
-      shipping: delivery.price,
-      tax: tax + delivery.price * siteConfig.taxRate,
-      total: totalWithDelivery,
-      couponCode: coupon?.code,
-      shippingAddress: sameAsBilling ? shippingAddress : { ...shippingAddress },
-      billingAddress: sameAsBilling ? shippingAddress : billingAddress,
-      paymentMethod:
-        paymentMethod === "card"
-          ? `${cardDetails.name} (Card ending ${cardDetails.number.replace(/\s/g, "").slice(-4)})`
-          : paymentMethod === "paypal"
-            ? "PayPal"
-            : "Apple Pay",
-      deliveryMethod: delivery.name,
-      status: "pending",
-      createdAt: now.toISOString(),
-      estimatedDelivery: eta.toISOString(),
-      tracking: {
-        carrier: "NovaExpress",
-        trackingNumber: `NX-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
-        events: [
-          {
-            date: now.toISOString(),
-            label: "Order confirmed",
-            location: "Online",
-          },
-        ],
-      },
-    };
-
-    saveOrder(order);
-    dispatch(clearCart());
+    toast.error("Login required", "Please log in to complete your purchase.");
     setProcessing(false);
-    toast.success("Order placed!", `Order ${orderNumber} confirmed.`);
-    router.push(`/order-success?number=${orderNumber}`);
+    router.push("/login?redirect=/checkout");
   };
 
   const updateAddress = (

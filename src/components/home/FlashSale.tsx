@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FiClock } from "react-icons/fi";
 import { Container } from "@/components/ui/Container";
 import { ProductCard } from "@/components/product/ProductCard";
+import { LiveStockProvider } from "@/components/product/LiveStockProvider";
 import type { Product } from "@/lib/types";
 
 type FlashSaleProps = {
@@ -88,9 +89,11 @@ export function FlashSale({ products }: FlashSaleProps) {
           </div>
           <div className="p-6 sm:p-8">
             <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+              <LiveStockProvider productIds={products.map((product) => product.id)}>
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </LiveStockProvider>
             </div>
             <div className="mt-8 text-center">
               <Link

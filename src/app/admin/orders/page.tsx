@@ -20,7 +20,7 @@ import { StatusBadge } from "@/components/admin/StatusBadge";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
 import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
-import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
+import { dateRangeFromPreset, resolveDateRange, type DateRangePreset } from "@/lib/admin-filters";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { toast } from "@/hooks/use-toast";
@@ -45,13 +45,18 @@ export default function AdminOrdersPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [dateRange, setDateRange] = useState<DateRangePreset>("all");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<OrderStatus>("processing");
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
 
-  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+  const dates = useMemo(
+    () => resolveDateRange(dateRange, { start: customStart, end: customEnd }),
+    [dateRange, customStart, customEnd]
+  );
 
   const { data, isLoading } = useGetOrdersQuery({
     page,
@@ -309,6 +314,16 @@ export default function AdminOrdersPage() {
               value={dateRange}
               onChange={(v) => {
                 setDateRange(v);
+                setPage(1);
+              }}
+              customStart={customStart}
+              customEnd={customEnd}
+              onCustomStartChange={(v) => {
+                setCustomStart(v);
+                setPage(1);
+              }}
+              onCustomEndChange={(v) => {
+                setCustomEnd(v);
                 setPage(1);
               }}
             />

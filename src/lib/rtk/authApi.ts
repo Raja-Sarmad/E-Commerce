@@ -100,8 +100,19 @@ export const authApi = baseApi.injectEndpoints({
     updatePassword: builder.mutation<{ message?: string }, { currentPassword: string; newPassword: string }>({
       query: (body) => ({ url: "/users/me/password", method: "PATCH", body }),
     }),
-    getMyOrders: builder.query<Order[], void>({
-      query: () => ({ url: "/orders/my-orders" }),
+    getMyOrders: builder.query<
+      Order[],
+      { search?: string; start?: string; end?: string; status?: string } | void
+    >({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.search) qs.set("search", params.search);
+        if (params?.start) qs.set("start", params.start);
+        if (params?.end) qs.set("end", params.end);
+        if (params?.status) qs.set("status", params.status);
+        const q = qs.toString();
+        return { url: `/orders/my-orders${q ? `?${q}` : ""}` };
+      },
       transformResponse: (raw: unknown) =>
         ((raw as Array<Record<string, unknown>>) ?? []).map(normalizeOrder),
       providesTags: ["Orders"],

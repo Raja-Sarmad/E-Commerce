@@ -6,7 +6,8 @@ export type DateRangePreset =
   | "last_month"
   | "this_month"
   | "90d"
-  | "year";
+  | "year"
+  | "custom";
 
 export const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
   { value: "all", label: "All time" },
@@ -17,6 +18,7 @@ export const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
   { value: "this_month", label: "This month" },
   { value: "90d", label: "Last 90 days" },
   { value: "year", label: "This year" },
+  { value: "custom", label: "Custom dates" },
 ];
 
 function toIsoDate(d: Date) {
@@ -79,4 +81,18 @@ export function dateRangeFromPreset(preset: DateRangePreset): {
     default:
       return {};
   }
+}
+
+/** Resolve preset or custom YYYY-MM-DD inputs to API query params. */
+export function resolveDateRange(
+  preset: DateRangePreset,
+  custom?: { start?: string; end?: string }
+): { start?: string; end?: string } {
+  if (preset === "custom") {
+    return {
+      start: custom?.start || undefined,
+      end: custom?.end || undefined,
+    };
+  }
+  return dateRangeFromPreset(preset);
 }

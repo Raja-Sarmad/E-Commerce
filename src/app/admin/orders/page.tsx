@@ -19,6 +19,8 @@ import { StatCard } from "@/components/admin/StatCard";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { toast } from "@/hooks/use-toast";
@@ -42,17 +44,21 @@ const PER_PAGE = 8;
 export default function AdminOrdersPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<OrderStatus>("processing");
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
 
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
   const { data, isLoading } = useGetOrdersQuery({
     page,
     limit: pageSize,
     search: query || undefined,
     status: status !== "all" ? status : undefined,
+    ...dates,
   });
 
   const [updateOrderStatus] = useUpdateOrderStatusMutation();
@@ -298,7 +304,15 @@ export default function AdminOrdersPage() {
         }}
         searchPlaceholder="Search by order # or customer..."
         leftSlot={
-          <Select
+          <>
+            <DateRangeFilter
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v);
+                setPage(1);
+              }}
+            />
+            <Select
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
@@ -314,6 +328,7 @@ export default function AdminOrdersPage() {
               </option>
             ))}
           </Select>
+          </>
         }
       />
 

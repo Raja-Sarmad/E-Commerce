@@ -11,6 +11,8 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { toast } from "@/hooks/use-toast";
@@ -62,16 +64,22 @@ export default function AdminCustomersPage() {
   const [query, setQuery] = useState("");
   const [tier, setTier] = useState("all");
   const [status, setStatus] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [extras, setExtras] = useState<Record<string, CustomerExtras>>({});
   const [viewUser, setViewUser] = useState<User | null>(null);
+
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
 
   const { data, isLoading } = useGetUsersQuery({
     page,
     limit: pageSize,
     search: query || undefined,
     role: "customer",
+    tier: tier !== "all" ? tier : undefined,
+    status: status !== "all" ? status : undefined,
+    ...dates,
   });
 
   const rows = useMemo<CustomerRow[]>(() => {
@@ -87,15 +95,8 @@ export default function AdminCustomersPage() {
     [rows]
   );
 
-  const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      const matchesTier = tier === "all" || r.extras.tier === tier;
-      const matchesStatus = status === "all" || r.extras.status === status;
-      return matchesTier && matchesStatus;
-    });
-  }, [rows, tier, status]);
-
-  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(filtered.length / pageSize));
+  const filtered = rows;
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil((data?.total ?? filtered.length) / pageSize));
   const pageItems = filtered;
 
   const handlePageSize = (size: number) => {
@@ -240,6 +241,13 @@ export default function AdminCustomersPage() {
         searchPlaceholder="Search by name or email..."
         leftSlot={
           <>
+            <DateRangeFilter
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v);
+                setPage(1);
+              }}
+            />
             <Select
               value={tier}
               onChange={(e) => {

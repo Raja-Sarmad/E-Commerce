@@ -70,7 +70,8 @@ export default function AdminDashboardPage() {
   const { data: recentOrdersRaw = [] } = useGetRecentOrdersQuery(undefined, { pollingInterval: POLL_INTERVAL });
   const { data: recentReviews = [] } = useGetRecentReviewsQuery(undefined, { pollingInterval: POLL_INTERVAL });
   const { data: allOrdersData } = useGetOrdersQuery({ page: 1, limit: 1 });
-  const { data: notificationsData = [] } = useGetAdminNotificationsQuery();
+  const { data: notificationsResponse } = useGetAdminNotificationsQuery({ limit: 8 });
+  const notificationsData = notificationsResponse?.items ?? [];
   const { data: activityData = [] } = useGetRecentActivityQuery(8, { pollingInterval: POLL_INTERVAL });
   const { data: comparison } = useGetRevenueComparisonQuery(undefined, { pollingInterval: POLL_INTERVAL });
 

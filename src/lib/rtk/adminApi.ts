@@ -65,15 +65,30 @@ function buildQs(params: Record<string, string | number | undefined>): string {
   return qs.toString() ? `?${qs.toString()}` : "";
 }
 
-function toItemList<T>(raw: unknown, idKey = "_id"): ListResponse<T> {
-  const data = (raw as { data?: unknown })?.data ?? raw;
-  const items = (Array.isArray(data) ? data : []) as T[];
-  return {
-    items,
-    total: items.length,
-    page: 1,
-    totalPages: 1,
+function parseListResponse<T>(raw: unknown, mapId = false): ListResponse<T> {
+  const envelope = raw as {
+    data?: unknown;
+    meta?: { page?: number; limit?: number; total?: number; totalPages?: number };
   };
+  const data = envelope?.data ?? raw;
+  const rows = Array.isArray(data) ? data : [];
+  const items = (mapId
+    ? rows.map((item) => {
+        const row = item as Record<string, unknown>;
+        const { _id, ...rest } = row;
+        return { ...rest, id: String(_id ?? row.id ?? "") } as T;
+      })
+    : rows) as T[];
+  const meta = envelope?.meta;
+  const total = meta?.total ?? items.length;
+  const page = meta?.page ?? 1;
+  const limit = meta?.limit ?? (items.length || 1);
+  const totalPages = meta?.totalPages ?? Math.max(1, Math.ceil(total / limit));
+  return { items, total, page, totalPages };
+}
+
+function toItemList<T>(raw: unknown): ListResponse<T> {
+  return parseListResponse<T>(raw);
 }
 
 export const adminApi = baseApi.injectEndpoints({
@@ -172,14 +187,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Orders ────────────────────────────────────────────────── */
     getOrders: builder.query<ListResponse<Order>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/orders/admin/list${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []).map((o) => {
-          const { _id, ...rest } = o as Record<string, unknown>;
-          return { ...rest, id: String(_id ?? "") } as unknown as Order;
-        });
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
+      transformResponse: (raw: unknown) => parseListResponse<Order>(raw, true),
       providesTags: ["Orders"],
     }),
     getOrderDetail: builder.query<Record<string, unknown>, string>({
@@ -199,14 +207,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Users / Customers ─────────────────────────────────────── */
     getUsers: builder.query<ListResponse<User>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/users${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []).map((u) => {
-          const { _id, ...rest } = u as Record<string, unknown>;
-          return { ...rest, id: String(_id ?? "") } as unknown as User;
-        });
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
+      transformResponse: (raw: unknown) => parseListResponse<User>(raw, true),
       providesTags: ["Users"],
     }),
     deleteUser: builder.mutation<unknown, string>({
@@ -286,11 +287,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Blog ──────────────────────────────────────────────────── */
     getAdminBlogPosts: builder.query<ListResponse<AdminBlogPost>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/blog/admin/list${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []) as AdminBlogPost[];
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
+      transformResponse: (raw: unknown) => parseListResponse<AdminBlogPost>(raw),
       providesTags: ["Blog"],
     }),
     createBlogPost: builder.mutation<AdminBlogPost, Partial<AdminBlogPost>>({
@@ -328,11 +325,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Reviews ───────────────────────────────────────────────── */
     getAdminReviews: builder.query<ListResponse<AdminReview>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/reviews/admin/list${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []) as AdminReview[];
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
+      transformResponse: (raw: unknown) => parseListResponse<AdminReview>(raw),
       providesTags: ["Reviews"],
     }),
     moderateReview: builder.mutation<unknown, { id: string; status: string }>({
@@ -366,11 +359,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Newsletter ────────────────────────────────────────────── */
     getAdminSubscribers: builder.query<ListResponse<AdminSubscriber>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/newsletter${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []) as AdminSubscriber[];
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
+      transformResponse: (raw: unknown) => parseListResponse<AdminSubscriber>(raw),
       providesTags: ["Settings"],
     }),
     deleteSubscriber: builder.mutation<unknown, string>({
@@ -381,11 +370,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Messages ──────────────────────────────────────────────── */
     getAdminMessages: builder.query<ListResponse<AdminMessage>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/messages/admin/list${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []) as AdminMessage[];
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
+      transformResponse: (raw: unknown) => parseListResponse<AdminMessage>(raw),
       providesTags: ["Settings"],
     }),
     updateMessage: builder.mutation<AdminMessage, { id: string; body: Partial<AdminMessage> }>({
@@ -398,12 +383,26 @@ export const adminApi = baseApi.injectEndpoints({
     }),
 
     /* ── Notifications ─────────────────────────────────────────── */
-    getAdminNotifications: builder.query<AdminNotification[], void>({
-      query: () => ({ url: "/notifications" }),
+    getAdminNotifications: builder.query<ListResponse<AdminNotification>, Record<string, string | number | undefined>>({
+      query: (params) => ({ url: `/notifications${buildQs(params)}` }),
       transformResponse: (raw: unknown) => {
-        const d = raw as Record<string, unknown> | null;
-        const arr = (d as { notifications?: unknown })?.notifications ?? (Array.isArray(d) ? d : []);
-        return (Array.isArray(arr) ? arr : []) as AdminNotification[];
+        const envelope = raw as {
+          data?: unknown;
+          notifications?: unknown;
+          meta?: { page?: number; limit?: number; total?: number; totalPages?: number };
+        };
+        const data = envelope?.data ?? envelope?.notifications ?? raw;
+        const rows = Array.isArray(data) ? data : [];
+        const meta = envelope?.meta;
+        const total = meta?.total ?? rows.length;
+        const page = meta?.page ?? 1;
+        const limit = meta?.limit ?? (rows.length || 1);
+        return {
+          items: rows as AdminNotification[],
+          total,
+          page,
+          totalPages: meta?.totalPages ?? Math.max(1, Math.ceil(total / limit)),
+        };
       },
       providesTags: ["Dashboard"],
     }),
@@ -423,12 +422,7 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Coupons ───────────────────────────────────────────────── */
     getAdminCoupons: builder.query<ListResponse<AdminCoupon>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/coupons${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []) as AdminCoupon[];
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
-      providesTags: ["Coupons"],
+      transformResponse: (raw: unknown) => parseListResponse<AdminCoupon>(raw),
     }),
     createCoupon: builder.mutation<AdminCoupon, Partial<AdminCoupon>>({
       query: (body) => ({ url: "/coupons", method: "POST", body }),
@@ -503,11 +497,7 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     getAdminTransactions: builder.query<ListResponse<AdminTransaction>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/payments/admin/transactions${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []) as AdminTransaction[];
-        return { items, total: items.length, page: 1, totalPages: 1 };
-      },
+      transformResponse: (raw: unknown) => parseListResponse<AdminTransaction>(raw),
       providesTags: ["Payments"],
     }),
     updateTransactionStatus: builder.mutation<unknown, { id: string; status: string }>({
@@ -578,9 +568,9 @@ export const adminApi = baseApi.injectEndpoints({
       transformResponse: (raw: unknown) => ((raw as { data?: unknown })?.data ?? raw) as Array<{ _id: string; name: string; price: number; stock: number; sku?: string }>,
       providesTags: ["Products"],
     }),
-    getInventoryHistory: builder.query<InventoryEntry[], Record<string, string | number | undefined>>({
+    getInventoryHistory: builder.query<ListResponse<InventoryEntry>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/inventory/history${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => ((raw as { data?: unknown })?.data ?? raw) as InventoryEntry[],
+      transformResponse: (raw: unknown) => parseListResponse<InventoryEntry>(raw),
       providesTags: ["Products"],
     }),
     adjustInventory: builder.mutation<unknown, { productId: string; adjustment: number; reason?: string }>({
@@ -604,9 +594,9 @@ export const adminApi = baseApi.injectEndpoints({
     }),
 
     /* ── Logs ──────────────────────────────────────────────────── */
-    getAdminLogs: builder.query<AdminLog[], Record<string, string | number | undefined>>({
+    getAdminLogs: builder.query<ListResponse<AdminLog>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/logs${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => ((raw as { data?: unknown })?.data ?? raw) as AdminLog[],
+      transformResponse: (raw: unknown) => parseListResponse<AdminLog>(raw),
       providesTags: ["Settings"],
     }),
     clearLogs: builder.mutation<unknown, void>({

@@ -13,6 +13,8 @@ import {
 } from "react-icons/fi";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { FilterBar } from "@/components/admin/FilterBar";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -56,15 +58,22 @@ const typeStyles: Record<string, { icon: ReactNode; className: string }> = {
 
 export default function AdminNotificationsPage() {
   const [typeFilter, setTypeFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
   const [query, setQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<AdminNotification | null>(null);
 
-  const { data: notificationsData, isLoading } = useGetAdminNotificationsQuery();
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
+  const { data: notificationsData, isLoading } = useGetAdminNotificationsQuery({
+    type: typeFilter !== "all" ? typeFilter : undefined,
+    limit: 50,
+    ...dates,
+  });
   const [markRead] = useMarkNotificationReadMutation();
   const [markAllRead] = useMarkAllNotificationsReadMutation();
   const [deleteNotification] = useDeleteNotificationMutation();
 
-  const items = useMemo(() => notificationsData ?? [], [notificationsData]);
+  const items = useMemo(() => notificationsData?.items ?? [], [notificationsData]);
 
   const unreadCount = useMemo(
     () => items.filter((n) => !n.read).length,
@@ -73,15 +82,13 @@ export default function AdminNotificationsPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((n) => {
-      const matchesType = typeFilter === "all" || n.type === typeFilter;
-      const matchesQuery =
-        !q ||
+    if (!q) return items;
+    return items.filter(
+      (n) =>
         n.title.toLowerCase().includes(q) ||
-        n.message.toLowerCase().includes(q);
-      return matchesType && matchesQuery;
-    });
-  }, [items, typeFilter, query]);
+        n.message.toLowerCase().includes(q)
+    );
+  }, [items, query]);
 
   const handleMarkAllRead = async () => {
     if (unreadCount === 0) return;
@@ -145,19 +152,25 @@ export default function AdminNotificationsPage() {
         onSearchChange={setQuery}
         searchPlaceholder="Search by title or message..."
         leftSlot={
-          <Select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            containerClassName="sm:w-44"
-            className="h-10"
-          >
-            <option value="all">All types</option>
-            <option value="order">Orders</option>
-            <option value="review">Reviews</option>
-            <option value="stock">Stock</option>
-            <option value="customer">Customers</option>
-            <option value="system">System</option>
-          </Select>
+          <>
+            <DateRangeFilter
+              value={dateRange}
+              onChange={setDateRange}
+            />
+            <Select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              containerClassName="sm:w-44"
+              className="h-10"
+            >
+              <option value="all">All types</option>
+              <option value="order">Orders</option>
+              <option value="review">Reviews</option>
+              <option value="stock">Stock</option>
+              <option value="customer">Customers</option>
+              <option value="system">System</option>
+            </Select>
+          </>
         }
       />
 

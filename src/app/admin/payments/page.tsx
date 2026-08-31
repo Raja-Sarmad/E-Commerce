@@ -10,6 +10,8 @@ import { Modal } from "@/components/ui/Modal";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { toast } from "@/hooks/use-toast";
@@ -51,16 +53,24 @@ function prettyKey(key: string) {
 export default function AdminPaymentsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [configureTarget, setConfigureTarget] = useState<AdminPaymentMethod | null>(null);
 
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
   const { data: methodsData, isLoading: methodsLoading } = useGetAdminPaymentMethodsQuery();
-  const { data: transactionsData, isLoading: transactionsLoading } = useGetAdminTransactionsQuery({});
+  const { data: transactionsData, isLoading: transactionsLoading } = useGetAdminTransactionsQuery({
+    page,
+    limit: pageSize,
+    search: query || undefined,
+    status: status !== "all" ? status : undefined,
+    ...dates,
+  });
   const [updatePaymentMethod] = useUpdatePaymentMethodMutation();
 
   const methods = useMemo(() => methodsData?.items ?? [], [methodsData]);
-  const allTransactions = useMemo(() => transactionsData?.items ?? [], [transactionsData]);
 
   const toggleMethod = async (method: AdminPaymentMethod) => {
     try {
@@ -77,21 +87,8 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return allTransactions.filter((t) => {
-      const matchesQuery =
-        !q ||
-        t.reference.toLowerCase().includes(q) ||
-        t.orderNumber.toLowerCase().includes(q) ||
-        t.customer.toLowerCase().includes(q);
-      const matchesStatus = status === "all" || t.status === status;
-      return matchesQuery && matchesStatus;
-    });
-  }, [allTransactions, query, status]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageItems = transactionsData?.items ?? [];
+  const totalPages = transactionsData?.totalPages ?? 1;
 
   const columns: Column<AdminTransaction>[] = [
     {
@@ -204,26 +201,35 @@ export default function AdminPaymentsPage() {
           }}
           searchPlaceholder="Search by reference, order or customer..."
           leftSlot={
-            <Select
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(1);
-              }}
-              containerClassName="sm:w-44"
-              className="h-10"
-            >
-              <option value="all">All statuses</option>
-              <option value="succeeded">Succeeded</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-              <option value="refunded">Refunded</option>
-            </Select>
+            <>
+              <DateRangeFilter
+                value={dateRange}
+                onChange={(v) => {
+                  setDateRange(v);
+                  setPage(1);
+                }}
+              />
+              <Select
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+                containerClassName="sm:w-44"
+                className="h-10"
+              >
+                <option value="all">All statuses</option>
+                <option value="succeeded">Succeeded</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+                <option value="refunded">Refunded</option>
+              </Select>
+            </>
           }
           rightSlot={
             <ExportButton
               filename="transactions"
-              data={filtered.map((t) => ({
+              data={pageItems.map((t) => ({
                 Reference: t.reference,
                 Order: t.orderNumber,
                 Customer: t.customer,
@@ -233,7 +239,7 @@ export default function AdminPaymentsPage() {
                 Status: t.status,
                 Date: t.createdAt,
               }))}
-              disabled={filtered.length === 0}
+              disabled={pageItems.length === 0}
             />
           }
         />
@@ -245,7 +251,7 @@ export default function AdminPaymentsPage() {
           pagination={{
             page,
             totalPages,
-            totalItems: filtered.length,
+            totalItems: transactionsData?.total ?? pageItems.length,
             pageSize,
             onPageChange: setPage,
             onPageSizeChange: (size) => {

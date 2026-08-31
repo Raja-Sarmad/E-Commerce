@@ -10,6 +10,8 @@ import { Modal } from "@/components/ui/Modal";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -61,17 +63,26 @@ type AdjustmentState = {
 export default function AdminInventoryPage() {
   const [query, setQuery] = useState("");
   const [direction, setDirection] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [adjustTarget, setAdjustTarget] = useState<InventoryEntry | null>(null);
   const [form, setForm] = useState<AdjustmentState>({ qty: "", reason: "" });
 
-  const { data: historyData, isLoading: historyLoading } = useGetInventoryHistoryQuery({});
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
+  const { data: historyData, isLoading: historyLoading } = useGetInventoryHistoryQuery({
+    page,
+    limit: pageSize,
+    search: query || undefined,
+    direction: direction !== "all" ? direction : undefined,
+    ...dates,
+  });
   const { data: lowStockItems, isLoading: lowStockLoading } = useGetInventoryLowStockQuery();
   const { data: productsData } = useGetAdminProductsQuery({});
   const [adjustInventory, { isLoading: adjusting }] = useAdjustInventoryMutation();
 
-  const entries = useMemo(() => historyData ?? [], [historyData]);
+  const entries = useMemo(() => historyData?.items ?? [], [historyData]);
   const allProducts = useMemo(() => productsData?.items ?? [], [productsData]);
   const lowStockList = useMemo(() => lowStockItems ?? [], [lowStockItems]);
 
@@ -85,25 +96,8 @@ export default function AdminInventoryPage() {
     [allProducts]
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return entries.filter((e) => {
-      const productName = e.product?.name ?? "";
-      const sku = e.product?.sku ?? "";
-      const matchesQuery =
-        !q ||
-        productName.toLowerCase().includes(q) ||
-        sku.toLowerCase().includes(q);
-      const matchesDirection =
-        direction === "all" ||
-        (direction === "in" && e.adjustment > 0) ||
-        (direction === "out" && e.adjustment < 0);
-      return matchesQuery && matchesDirection;
-    });
-  }, [entries, query, direction]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = historyData?.totalPages ?? 1;
+  const pageItems = entries;
 
   const handlePageSize = (size: number) => {
     setPageSize(size);
@@ -255,7 +249,7 @@ export default function AdminInventoryPage() {
         actions={
           <ExportButton
             filename="inventory-history"
-            data={filtered.map((e) => ({
+            data={pageItems.map((e) => ({
               Product: e.product?.name ?? "",
               SKU: e.product?.sku ?? "",
               Previous: e.previousStock,
@@ -265,7 +259,7 @@ export default function AdminInventoryPage() {
               User: e.user?.name ?? "",
               Date: formatDate(e.createdAt),
             }))}
-            disabled={filtered.length === 0}
+            disabled={pageItems.length === 0}
           />
         }
       />
@@ -305,19 +299,28 @@ export default function AdminInventoryPage() {
         }}
         searchPlaceholder="Search by product or SKU..."
         leftSlot={
-          <Select
-            value={direction}
-            onChange={(e) => {
-              setDirection(e.target.value);
-              setPage(1);
-            }}
-            containerClassName="sm:w-44"
-            className="h-10"
-          >
-            <option value="all">All adjustments</option>
-            <option value="in">Stock in</option>
-            <option value="out">Stock out</option>
-          </Select>
+          <>
+            <DateRangeFilter
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v);
+                setPage(1);
+              }}
+            />
+            <Select
+              value={direction}
+              onChange={(e) => {
+                setDirection(e.target.value);
+                setPage(1);
+              }}
+              containerClassName="sm:w-44"
+              className="h-10"
+            >
+              <option value="all">All adjustments</option>
+              <option value="in">Stock in</option>
+              <option value="out">Stock out</option>
+            </Select>
+          </>
         }
       />
 
@@ -328,7 +331,7 @@ export default function AdminInventoryPage() {
         pagination={{
           page,
           totalPages,
-          totalItems: filtered.length,
+          totalItems: historyData?.total ?? pageItems.length,
           pageSize,
           onPageChange: setPage,
           onPageSizeChange: handlePageSize,

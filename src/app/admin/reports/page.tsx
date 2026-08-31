@@ -18,6 +18,8 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { StatCard } from "@/components/admin/StatCard";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { ExportButton } from "@/components/admin/ExportButton";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { formatPrice, formatNumber } from "@/lib/utils";
 import {
@@ -47,8 +49,11 @@ type TabKey = (typeof reportTypes)[number]["key"];
 
 export default function AdminReportsPage() {
   const [active, setActive] = useState<TabKey>("sales");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("last_month");
 
-  const { data: salesData, isLoading: salesLoading } = useGetSalesReportQuery({});
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
+  const { data: salesData, isLoading: salesLoading } = useGetSalesReportQuery(dates);
   const { data: inventoryData, isLoading: invLoading } = useGetInventoryReportQuery({});
   const { data: customerData, isLoading: custLoading } = useGetCustomerReportQuery({});
   const { data: paymentsData, isLoading: payLoading } = useGetPaymentsReportQuery({});
@@ -134,6 +139,17 @@ export default function AdminReportsPage() {
           />
         }
       />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <DateRangeFilter
+          value={dateRange}
+          onChange={setDateRange}
+          containerClassName="sm:w-48"
+        />
+        <p className="text-sm text-muted-foreground">
+          Sales report period (other tabs show current snapshot)
+        </p>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

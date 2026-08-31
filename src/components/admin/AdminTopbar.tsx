@@ -153,9 +153,9 @@ export function AdminTopbar({
   useClickOutside([langRef], () => setLangOpen(false), langOpen);
   useClickOutside([quickRef], () => setQuickOpen(false), quickOpen);
 
-  const { data: notifData } = useGetAdminNotificationsQuery();
+  const { data: notifData } = useGetAdminNotificationsQuery({ limit: 8 });
   const { data: msgData } = useGetAdminMessagesQuery({});
-  const notifications = Array.isArray(notifData) ? notifData : [];
+  const notifications = notifData?.items ?? [];
   const contactMessages = Array.isArray(msgData?.items) ? msgData.items : [];
 
   const unread = notifications.filter((n) => !n.read).length;

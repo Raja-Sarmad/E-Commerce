@@ -11,6 +11,8 @@ import {
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
@@ -46,44 +48,37 @@ export default function AdminLogsPage() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [clearOpen, setClearOpen] = useState(false);
 
-  const { data: logsData, isLoading } = useGetAdminLogsQuery({});
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
+  const { data: logsData, isLoading } = useGetAdminLogsQuery({
+    page,
+    limit: pageSize,
+    search: query || undefined,
+    type: typeFilter !== "all" ? typeFilter : undefined,
+    level: levelFilter !== "all" ? levelFilter : undefined,
+    ...dates,
+  });
   const [clearLogsApi] = useClearLogsMutation();
 
-  const items: AdminLog[] = useMemo(() => {
-    return Array.isArray(logsData) ? logsData : [];
-  }, [logsData]);
+  const items: AdminLog[] = logsData?.items ?? [];
+  const totalPages = logsData?.totalPages ?? 1;
+  const totalItems = logsData?.total ?? items.length;
+  const pageItems = items;
 
   const stats = useMemo(
     () => ({
-      total: items.length,
+      total: totalItems,
       errors: items.filter((l) => l.level === "error").length,
       warnings: items.filter((l) => l.level === "warning").length,
       logins: items.filter((l) => l.type === "login").length,
     }),
-    [items]
+    [items, totalItems]
   );
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((l) => {
-      const matchesQuery =
-        !q ||
-        (l.user ?? "").toLowerCase().includes(q) ||
-        l.action.toLowerCase().includes(q) ||
-        l.details.toLowerCase().includes(q) ||
-        l.ip.toLowerCase().includes(q);
-      const matchesType = typeFilter === "all" || l.type === typeFilter;
-      const matchesLevel = levelFilter === "all" || l.level === levelFilter;
-      return matchesQuery && matchesType && matchesLevel;
-    });
-  }, [items, query, typeFilter, levelFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const handleClearLogs = async () => {
     try {
@@ -197,7 +192,7 @@ export default function AdminLogsPage() {
           <>
             <ExportButton
               filename="system-logs"
-              data={filtered.map((l) => ({
+              data={pageItems.map((l) => ({
                 Timestamp: l.createdAt,
                 Type: l.type,
                 Level: l.level,
@@ -206,7 +201,7 @@ export default function AdminLogsPage() {
                 Details: l.details,
                 IP: l.ip,
               }))}
-              disabled={filtered.length === 0}
+              disabled={pageItems.length === 0}
             />
             <Button
               variant="outline"
@@ -277,6 +272,13 @@ export default function AdminLogsPage() {
         searchPlaceholder="Search by user, action, details or IP..."
         leftSlot={
           <>
+            <DateRangeFilter
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v);
+                setPage(1);
+              }}
+            />
             <Select
               value={typeFilter}
               onChange={(e) => {
@@ -319,7 +321,7 @@ export default function AdminLogsPage() {
         pagination={{
           page,
           totalPages,
-          totalItems: filtered.length,
+          totalItems: totalItems,
           pageSize,
           onPageChange: setPage,
           onPageSizeChange: handlePageSize,

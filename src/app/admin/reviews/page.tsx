@@ -6,6 +6,8 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { FilterBar } from "@/components/admin/FilterBar";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -42,36 +44,30 @@ export default function AdminReviewsPage() {
   const [query, setQuery] = useState("");
   const [rating, setRating] = useState("all");
   const [status, setStatus] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [detailsTarget, setDetailsTarget] = useState<AdminReview | null>(null);
 
-  const { data, isLoading } = useGetAdminReviewsQuery({});
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
+  const { data, isLoading } = useGetAdminReviewsQuery({
+    page,
+    limit: pageSize,
+    search: query || undefined,
+    status: status !== "all" ? status : undefined,
+    rating: rating === "4" || rating === "5" ? rating : undefined,
+    ...dates,
+  });
   const [moderateReview] = useModerateReviewMutation();
 
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const pageItems = useMemo(() => {
+    const items = data?.items ?? [];
+    if (rating === "3plus") return items.filter((r) => r.rating >= 3);
+    return items;
+  }, [data, rating]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((r) => {
-      const matchesQuery =
-        !q ||
-        (r.user?.name ?? r.name ?? "").toLowerCase().includes(q) ||
-        r.title.toLowerCase().includes(q) ||
-        (r.product?.name ?? "").toLowerCase().includes(q) ||
-        r.body.toLowerCase().includes(q);
-      const matchesRating =
-        rating === "all" ||
-        (rating === "5" && r.rating === 5) ||
-        (rating === "4" && r.rating === 4) ||
-        (rating === "3plus" && r.rating >= 3);
-      const matchesStatus = status === "all" || r.status === status;
-      return matchesQuery && matchesRating && matchesStatus;
-    });
-  }, [items, query, rating, status]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = data?.totalPages ?? 1;
 
   const toggleStatus = async (review: AdminReview) => {
     const nextStatus = review.status === "approved" ? "hidden" : "approved";
@@ -218,12 +214,12 @@ export default function AdminReviewsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Reviews"
-        subtitle={`Moderate customer feedback — ${data?.total ?? items.length} reviews total.`}
+        subtitle={`Moderate customer feedback — ${data?.total ?? pageItems.length} reviews total.`}
         breadcrumb={[{ label: "Reviews" }]}
         actions={
           <ExportButton
             filename="reviews"
-            data={filtered.map((r) => ({
+            data={pageItems.map((r) => ({
               Product: r.product?.name ?? "",
               Customer: r.user?.name ?? r.name ?? "",
               Rating: r.rating,
@@ -234,7 +230,7 @@ export default function AdminReviewsPage() {
               Status: r.status,
               Helpful: r.helpful,
             }))}
-            disabled={filtered.length === 0}
+            disabled={pageItems.length === 0}
           />
         }
       />
@@ -248,6 +244,13 @@ export default function AdminReviewsPage() {
         searchPlaceholder="Search by customer, product or review..."
         leftSlot={
           <>
+            <DateRangeFilter
+              value={dateRange}
+              onChange={(v) => {
+                setDateRange(v);
+                setPage(1);
+              }}
+            />
             <Select
               value={rating}
               onChange={(e) => {
@@ -291,7 +294,7 @@ export default function AdminReviewsPage() {
           pagination={{
             page,
             totalPages,
-            totalItems: filtered.length,
+            totalItems: data?.total ?? pageItems.length,
             pageSize,
             onPageChange: setPage,
             onPageSizeChange: handlePageSize,

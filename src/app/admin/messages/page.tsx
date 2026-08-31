@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
+import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { toast } from "@/hooks/use-toast";
@@ -24,31 +26,29 @@ import { formatDateLong, timeAgo } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export default function AdminMessagesPage() {
-  const { data } = useGetAdminMessagesQuery({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<DateRangePreset>("all");
+  const [query, setQuery] = useState("");
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState("");
+
+  const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
+
+  const { data } = useGetAdminMessagesQuery({
+    search: query || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+    limit: 100,
+    ...dates,
+  });
+
   const [updateMessage] = useUpdateMessageMutation();
   const [deleteMessage] = useDeleteMessageMutation();
 
   const items: AdminMessage[] = data?.items ?? [];
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [query, setQuery] = useState("");
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [replyText, setReplyText] = useState("");
-
   const selected = items.find((m) => m._id === selectedId) ?? null;
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((m) => {
-      const matchesQuery =
-        !q ||
-        m.name.toLowerCase().includes(q) ||
-        m.subject.toLowerCase().includes(q);
-      const matchesStatus = statusFilter === "all" || m.status === statusFilter;
-      return matchesQuery && matchesStatus;
-    });
-  }, [items, query, statusFilter]);
+  const filtered = items;
 
   const toggleRead = async (message: AdminMessage) => {
     const newStatus = message.status === "read" ? "unread" : "read";
@@ -124,6 +124,11 @@ export default function AdminMessagesPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_2fr]">
         <Card className="flex h-full flex-col overflow-hidden">
           <div className="space-y-3 border-b border-border p-4">
+            <DateRangeFilter
+              value={dateRange}
+              onChange={setDateRange}
+              containerClassName="w-full"
+            />
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}

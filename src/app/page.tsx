@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { Hero } from "@/components/home/Hero";
 import { CategoryShowcase } from "@/components/home/CategoryShowcase";
 import { ProductSection } from "@/components/home/ProductSection";
-import { FlashSale } from "@/components/home/FlashSale";
-import { PromoBanner } from "@/components/home/PromoBanner";
-import { BrandShowcase } from "@/components/home/BrandShowcase";
 import {
   getFeaturedProducts,
   getBestSellers,
@@ -14,7 +12,17 @@ import {
   getRecommendedProducts,
 } from "@/lib/api/server";
 
-export const dynamic = "force-dynamic";
+const FlashSale = dynamic(() =>
+  import("@/components/home/FlashSale").then((m) => ({ default: m.FlashSale }))
+);
+const PromoBanner = dynamic(() =>
+  import("@/components/home/PromoBanner").then((m) => ({ default: m.PromoBanner }))
+);
+const BrandShowcase = dynamic(() =>
+  import("@/components/home/BrandShowcase").then((m) => ({ default: m.BrandShowcase }))
+);
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Premium Shopping, Delivered",

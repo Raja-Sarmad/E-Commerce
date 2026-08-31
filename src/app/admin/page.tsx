@@ -46,7 +46,8 @@ import { formatPrice, formatNumber, timeAgo } from "@/lib/utils";
 import type { Order } from "@/lib/types";
 import { useMemo } from "react";
 
-const POLL_INTERVAL = 30000;
+const POLL_INTERVAL = 120000;
+const POLL_OPTS = { pollingInterval: POLL_INTERVAL, skipPollingIfUnfocused: true } as const;
 
 const donutColors = [
   "var(--color-primary)",
@@ -61,19 +62,19 @@ const donutColors = [
 export default function AdminDashboardPage() {
   const { data: user } = useGetMeQuery();
 
-  const { data: overview } = useGetDashboardOverviewQuery(undefined, { pollingInterval: POLL_INTERVAL });
-  const { data: revenueSeries = [] } = useGetRevenueSeriesQuery(8, { pollingInterval: POLL_INTERVAL });
-  const { data: categorySales = [] } = useGetSalesByCategoryQuery(undefined, { pollingInterval: POLL_INTERVAL });
-  const { data: dailyOrders = [] } = useGetDailyOrdersQuery(undefined, { pollingInterval: POLL_INTERVAL });
-  const { data: topProducts = [] } = useGetTopProductsQuery(undefined, { pollingInterval: POLL_INTERVAL });
-  const { data: lowStock = [] } = useGetLowStockQuery(undefined, { pollingInterval: POLL_INTERVAL });
-  const { data: recentOrdersRaw = [] } = useGetRecentOrdersQuery(undefined, { pollingInterval: POLL_INTERVAL });
-  const { data: recentReviews = [] } = useGetRecentReviewsQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: overview } = useGetDashboardOverviewQuery(undefined, POLL_OPTS);
+  const { data: revenueSeries = [] } = useGetRevenueSeriesQuery(8, POLL_OPTS);
+  const { data: categorySales = [] } = useGetSalesByCategoryQuery(undefined, POLL_OPTS);
+  const { data: dailyOrders = [] } = useGetDailyOrdersQuery(undefined, POLL_OPTS);
+  const { data: topProducts = [] } = useGetTopProductsQuery(undefined, POLL_OPTS);
+  const { data: lowStock = [] } = useGetLowStockQuery(undefined, POLL_OPTS);
+  const { data: recentOrdersRaw = [] } = useGetRecentOrdersQuery(undefined, POLL_OPTS);
+  const { data: recentReviews = [] } = useGetRecentReviewsQuery(undefined, POLL_OPTS);
   const { data: allOrdersData } = useGetOrdersQuery({ page: 1, limit: 1 });
   const { data: notificationsResponse } = useGetAdminNotificationsQuery({ limit: 8 });
   const notificationsData = notificationsResponse?.items ?? [];
-  const { data: activityData = [] } = useGetRecentActivityQuery(8, { pollingInterval: POLL_INTERVAL });
-  const { data: comparison } = useGetRevenueComparisonQuery(undefined, { pollingInterval: POLL_INTERVAL });
+  const { data: activityData = [] } = useGetRecentActivityQuery(8, POLL_OPTS);
+  const { data: comparison } = useGetRevenueComparisonQuery(undefined, POLL_OPTS);
 
   const totalRevenue = overview?.revenue ?? 0;
   const totalOrders = overview?.orders ?? 0;

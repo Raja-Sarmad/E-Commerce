@@ -30,7 +30,7 @@ export function ProductSection({
       : "grid-cols-2 md:grid-cols-3";
 
   return (
-    <section aria-labelledby={`${title}-heading`} className="py-12 sm:py-16">
+    <section aria-labelledby={`${title}-heading`} className="section-deferred py-12 sm:py-16">
       <Container>
         <SectionHeader
           badge={badge}

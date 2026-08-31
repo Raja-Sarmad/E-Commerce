@@ -24,18 +24,33 @@ export class ApiError extends Error {
 
 type FetchOptions = RequestInit & {
   timeoutMs?: number;
+  /** Next.js server-only: ISR revalidate seconds (omit = no-store) */
+  revalidate?: number | false;
 };
 
 export async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<ApiEnvelope<T>> {
-  const { timeoutMs = API_TIMEOUT_MS, ...init } = options;
+  const { timeoutMs = API_TIMEOUT_MS, revalidate, ...init } = options;
   const url = path.startsWith("http") ? path : `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  const isServer = typeof window === "undefined";
+  const fetchInit: RequestInit = { ...init };
+
+  if (isServer) {
+    if (revalidate === false || revalidate === undefined) {
+      fetchInit.cache = "no-store";
+    } else {
+      (fetchInit as RequestInit & { next?: { revalidate: number } }).next = {
+        revalidate,
+      };
+    }
+  }
+
   try {
     const res = await fetch(url, {
-      ...init,
+      ...fetchInit,
       ...(typeof window !== "undefined" ? { signal: controller.signal } : {}),
       credentials: "include",
       headers: {
@@ -76,7 +91,7 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
 }
 
 export const apiGet = <T>(path: string, init: FetchOptions = {}) =>
-  apiFetch<T>(path, { ...init, method: "GET", cache: "no-store" });
+  apiFetch<T>(path, { ...init, method: "GET" });
 
 export const apiPost = <T>(path: string, body?: unknown, init: FetchOptions = {}) =>
   apiFetch<T>(path, {

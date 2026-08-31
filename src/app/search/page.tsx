@@ -10,7 +10,7 @@ import { FiSearch } from "react-icons/fi";
 
 const PER_PAGE = 12;
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 type SearchPageProps = PageProps<"/search">;
 

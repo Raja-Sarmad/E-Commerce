@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { getBlogPosts } from "@/lib/api/server";
 import { formatDate } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: "The NovaMart Blog",

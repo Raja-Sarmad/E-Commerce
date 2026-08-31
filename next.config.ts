@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   poweredByHeader: false,
   compress: true,
+  experimental: {
+    optimizePackageImports: ["react-icons/fi", "react-icons/hi", "react-icons/fa", "react-icons/io5"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24,

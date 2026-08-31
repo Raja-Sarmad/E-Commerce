@@ -10,7 +10,7 @@ import { ReviewsSection } from "@/components/product/ReviewsSection";
 import { ProductSection } from "@/components/home/ProductSection";
 import { getProductBySlug } from "@/lib/api/server";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 type ProductPageProps = PageProps<"/shop/[slug]">;
 

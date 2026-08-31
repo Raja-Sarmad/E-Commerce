@@ -31,6 +31,7 @@ export type ProductQuery = {
 };
 
 const DEFAULT_SORT = "position";
+const CATALOG_REVALIDATE = 60;
 
 function buildProductQuery(query: ProductQuery): Record<string, string> {
   const q: Record<string, string> = { sort: query.sort ?? DEFAULT_SORT };
@@ -64,7 +65,9 @@ function toProduct(p: ApiProduct): Product {
 
 export async function getProducts(query: ProductQuery = {}): Promise<ProductListResult> {
   const qs = toQueryString(buildProductQuery(query));
-  const env = await apiGet<ApiProduct[]>(`/products${qs ? `?${qs}` : ""}`);
+  const env = await apiGet<ApiProduct[]>(`/products${qs ? `?${qs}` : ""}`, {
+    revalidate: CATALOG_REVALIDATE,
+  });
   const products = (env.data ?? []).map(toProduct);
   const meta = env.meta as unknown as ListMeta | undefined;
   return {
@@ -119,7 +122,9 @@ export type ProductDetail = Product & { related: Product[] };
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
   try {
-    const env = await apiGet<Record<string, unknown>>(`/products/slug/${slug}`);
+    const env = await apiGet<Record<string, unknown>>(`/products/slug/${slug}`, {
+      revalidate: CATALOG_REVALIDATE,
+    });
     const data = env.data as unknown as (ProductDetail & { _id?: string }) | undefined;
     if (!data) return null;
     const { related, ...rest } = data as Record<string, unknown>;
@@ -145,7 +150,9 @@ export async function searchProducts(query: string): Promise<Product[]> {
 
 export async function getCategories(): Promise<Category[]> {
   try {
-    const env = await apiGet<Array<Category & { _id?: string }>>(`/categories/all`);
+    const env = await apiGet<Array<Category & { _id?: string }>>(`/categories/all`, {
+      revalidate: CATALOG_REVALIDATE,
+    });
     return (env.data ?? []).map((c) => ({
       ...normalizeId(c),
       count: typeof c.count === "number" ? c.count : 0,
@@ -157,7 +164,9 @@ export async function getCategories(): Promise<Category[]> {
 
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
   try {
-    const env = await apiGet<Category & { _id?: string }>(`/categories/slug/${slug}`);
+    const env = await apiGet<Category & { _id?: string }>(`/categories/slug/${slug}`, {
+      revalidate: CATALOG_REVALIDATE,
+    });
     return env.data ? normalizeId(env.data) : null;
   } catch {
     return null;
@@ -166,7 +175,9 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
 
 export async function getBrands(): Promise<Brand[]> {
   try {
-    const env = await apiGet<Array<Brand & { _id?: string }>>(`/brands/all`);
+    const env = await apiGet<Array<Brand & { _id?: string }>>(`/brands/all`, {
+      revalidate: CATALOG_REVALIDATE,
+    });
     return (env.data ?? []).map(normalizeId);
   } catch {
     return [];
@@ -175,7 +186,9 @@ export async function getBrands(): Promise<Brand[]> {
 
 export async function getBlogPosts(limit = 9): Promise<BlogPost[]> {
   try {
-    const env = await apiGet<Array<BlogPost & { _id?: string }>>(`/blog?limit=${limit}`);
+    const env = await apiGet<Array<BlogPost & { _id?: string }>>(`/blog?limit=${limit}`, {
+      revalidate: CATALOG_REVALIDATE,
+    });
     return (env.data ?? []).map(normalizeId);
   } catch {
     return [];
@@ -184,7 +197,9 @@ export async function getBlogPosts(limit = 9): Promise<BlogPost[]> {
 
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
   try {
-    const env = await apiGet<BlogPost & { _id?: string }>(`/blog/slug/${slug}`);
+    const env = await apiGet<BlogPost & { _id?: string }>(`/blog/slug/${slug}`, {
+      revalidate: CATALOG_REVALIDATE,
+    });
     return env.data ? normalizeId(env.data) : null;
   } catch {
     return null;

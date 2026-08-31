@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { getBlogPostBySlug, getBlogPosts } from "@/lib/api/server";
 import { formatDate } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 type BlogPostPageProps = PageProps<"/blog/[slug]">;
 

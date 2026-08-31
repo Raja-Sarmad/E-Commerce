@@ -4,7 +4,7 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { getCategories, getProducts } from "@/lib/api/server";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Categories",

@@ -79,7 +79,19 @@ export const baseApi = createApi({
 
 export function getErrorMessage(err: unknown): string {
   if (err && typeof err === "object" && "data" in err) {
-    const data = (err as { data?: { message?: string } }).data;
+    const data = (err as {
+      data?: {
+        message?: string;
+        details?: Array<{ field?: string; message?: string }>;
+      };
+    }).data;
+    if (data?.details?.length) {
+      const detailText = data.details
+        .map((d) => d.message)
+        .filter(Boolean)
+        .join(" ");
+      if (detailText) return detailText;
+    }
     if (data?.message) return data.message;
   }
   if (err && typeof err === "object" && "status" in err) {

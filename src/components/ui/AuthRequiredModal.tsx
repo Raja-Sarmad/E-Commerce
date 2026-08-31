@@ -24,7 +24,7 @@ export function AuthRequiredModal({ open, onClose }: AuthRequiredModalProps) {
             <FiLogIn className="h-4 w-4" aria-hidden />
             Login
           </Button>
-          <Button href="/signup" onClick={onClose} variant="outline" className="flex-1">
+          <Button href="/register" onClick={onClose} variant="outline" className="flex-1">
             <FiUserPlus className="h-4 w-4" aria-hidden />
             Sign up
           </Button>

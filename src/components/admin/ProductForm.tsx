@@ -24,6 +24,7 @@ import {
   useGetAdminCategoriesQuery,
 } from "@/lib/rtk/adminApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
+import { uploadFileToCloudinary } from "@/lib/cloudinary-upload";
 import { slugify, formatPrice } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
@@ -198,6 +199,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   useEffect(() => {
     if (mode !== "create" || initial || categories.length === 0) return;
@@ -282,19 +284,28 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     form.colors.forEach((c) => formData.append("colors", c));
     form.sizes.forEach((s) => formData.append("sizes", s));
 
-    const urlImages: string[] = [];
-    for (const entry of images) {
-      if (entry.kind === "file") {
-        formData.append("images", entry.file);
-      } else {
-        urlImages.push(entry.url);
-      }
-    }
-    if (urlImages.length > 0) {
-      formData.append("imageUrls", JSON.stringify(urlImages));
-    }
-
     try {
+      const fileEntries = images.filter(
+        (entry): entry is Extract<ImageEntry, { kind: "file" }> => entry.kind === "file"
+      );
+      const urlImages = images
+        .filter((entry): entry is Extract<ImageEntry, { kind: "url" }> => entry.kind === "url")
+        .map((entry) => entry.url);
+
+      if (fileEntries.length > 0) {
+        setUploadingImages(true);
+        toast.info("Uploading images", "Sending photos directly to Cloudinary...");
+        for (const entry of fileEntries) {
+          const uploaded = await uploadFileToCloudinary(entry.file);
+          urlImages.push(uploaded.url);
+        }
+        setUploadingImages(false);
+      }
+
+      if (urlImages.length > 0) {
+        formData.append("imageUrls", JSON.stringify(urlImages));
+      }
+
       if (mode === "edit" && initial) {
         await updateProduct({ id: initial.id, body: formData }).unwrap();
       } else {
@@ -308,6 +319,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
       router.push("/admin/products");
     } catch (err) {
       setSaving(false);
+      setUploadingImages(false);
       toast.error(
         mode === "edit" ? "Could not update product" : "Could not create product",
         getErrorMessage(err)
@@ -698,10 +710,14 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         </Button>
         <Button
           onClick={handleSubmit}
-          loading={saving}
-          leftIcon={!saving ? <FiSave className="h-4 w-4" aria-hidden /> : undefined}
+          loading={saving || uploadingImages}
+          leftIcon={!saving && !uploadingImages ? <FiSave className="h-4 w-4" aria-hidden /> : undefined}
         >
-          {mode === "edit" ? "Save changes" : "Create product"}
+          {uploadingImages
+            ? "Uploading images..."
+            : mode === "edit"
+              ? "Save changes"
+              : "Create product"}
         </Button>
       </div>
     </div>

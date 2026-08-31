@@ -236,12 +236,12 @@ export default function AdminAnalyticsPage() {
           />
         </ChartCard>
 
-        <ChartCard title="Top products" subtitle="Best performing products">
+        <ChartCard title="Top products" subtitle="By units sold from orders">
           <div className="flex h-full flex-col justify-center gap-3">
             {topProducts.slice(0, 5).map((p) => (
-              <div key={p._id} className="flex items-center justify-between">
-                <span className="text-sm font-medium text-foreground">{p.name}</span>
-                <span className="text-sm text-muted-foreground">★ {p.rating}</span>
+              <div key={p._id} className="flex items-center justify-between gap-3">
+                <span className="truncate text-sm font-medium text-foreground">{p.name}</span>
+                <span className="shrink-0 text-sm text-muted-foreground">{p.totalSold ?? 0} sold</span>
               </div>
             ))}
             {topProducts.length === 0 && (
@@ -256,9 +256,9 @@ export default function AdminAnalyticsPage() {
           <FiEye className="h-5 w-5" aria-hidden />
         </span>
         <p className="text-sm text-muted-foreground">
-          Best seller this month:{" "}
+          Best seller:{" "}
           <span className="font-bold text-foreground">{bestSeller?.name ?? "—"}</span>
-          {bestSeller && <> — {bestSeller.reviewsCount} reviews, ★ {bestSeller.rating}. {overview?.orders ?? 0} total orders.</>}
+          {bestSeller && <> — {bestSeller.totalSold ?? 0} units sold.</>}
         </p>
       </div>
     </div>

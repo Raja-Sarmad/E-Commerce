@@ -662,7 +662,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             {(
               [
                 { key: "isFeatured", label: "Featured" },
-                { key: "isBestSeller", label: "Best seller" },
+                { key: "isBestSeller", label: "Best seller (manual highlight)" },
                 { key: "isNew", label: "New arrival" },
                 { key: "isTrending", label: "Trending" },
                 { key: "onSale", label: "On sale" },

@@ -320,7 +320,7 @@ export default function AdminDashboardPage() {
         />
 
         <div className="space-y-6">
-          <ChartCard title="Top products" subtitle="By number of reviews">
+          <ChartCard title="Top products" subtitle="By units sold">
             <ul className="divide-y divide-border">
               {topProducts.map((product, i) => (
                 <li
@@ -339,7 +339,7 @@ export default function AdminDashboardPage() {
                     </p>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                       <FiStar className="h-3 w-3 text-warning" aria-hidden />
-                      {product.rating} · {product.reviewsCount} reviews
+                      {product.totalSold ?? 0} sold · ★ {product.rating}
                     </p>
                   </div>
                   <span className="text-sm font-bold text-foreground">

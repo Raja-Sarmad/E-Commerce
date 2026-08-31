@@ -141,7 +141,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
                 <Badge variant="destructive">-{discount}%</Badge>
               )}
               {product.isNew && <Badge variant="success">New</Badge>}
-              {product.isBestSeller && (
+              {(product.isBestSeller || (product.totalSold ?? 0) > 0) && (
                 <Badge variant="accent">Best Seller</Badge>
               )}
             </div>

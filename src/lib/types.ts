@@ -36,6 +36,7 @@ export type Product = {
   images: string[];
   rating: number;
   reviewsCount: number;
+  totalSold?: number;
   stock: number;
   sku: string;
   tags: string[];

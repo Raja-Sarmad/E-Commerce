@@ -132,7 +132,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           </Badge>
           {discount > 0 && <Badge variant="destructive">Save {discount}%</Badge>}
           {product.isNew && <Badge variant="success">New Arrival</Badge>}
-          {product.isBestSeller && <Badge variant="accent">Best Seller</Badge>}
+          {(product.isBestSeller || (product.totalSold ?? 0) > 0) && <Badge variant="accent">Best Seller</Badge>}
         </div>
         <h1 className="mt-3 text-2xl font-extrabold leading-tight tracking-tight text-foreground sm:text-3xl">
           {product.name}

@@ -65,6 +65,7 @@ function normalizeProduct(p: Record<string, unknown>): Product {
     images: Array.isArray(p.images) ? (p.images as string[]) : [],
     rating: Number(p.rating ?? 0),
     reviewsCount: Number(p.reviewsCount ?? 0),
+    totalSold: Number(p.totalSold ?? 0),
     stock: Number(p.stock ?? 0),
     sku: String(p.sku ?? ""),
     tags: Array.isArray(p.tags) ? (p.tags as string[]) : [],

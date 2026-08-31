@@ -25,7 +25,7 @@ import {
 } from "@/lib/rtk/adminApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { uploadFileToCloudinary } from "@/lib/cloudinary-upload";
-import { slugify, formatPrice } from "@/lib/utils";
+import { slugify, formatPrice, sanitizePositiveDecimal, sanitizeWholeNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 
@@ -267,8 +267,10 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     formData.append("category", form.category);
     formData.append("categorySlug", form.categorySlug);
     formData.append("description", form.description.trim());
-    formData.append("price", form.price);
-    if (form.compareAtPrice) formData.append("compareAtPrice", form.compareAtPrice);
+    formData.append("price", String(Math.max(0, Number(form.price) || 0)));
+    if (form.compareAtPrice) {
+      formData.append("compareAtPrice", String(Math.max(0, Number(form.compareAtPrice) || 0)));
+    }
     formData.append("stock", form.stock);
     formData.append("sku", form.sku.trim());
     formData.append("position", form.position || "0");
@@ -457,21 +459,27 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label="Price (USD)"
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={form.price}
-            onChange={(e) => set("price", e.target.value)}
+            onChange={(e) => set("price", sanitizePositiveDecimal(e.target.value))}
+            onKeyDown={(e) => {
+              if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
+            }}
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
             error={fieldErrors.price}
             placeholder="99.00"
           />
           <Input
             label="Compare-at price (USD)"
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={form.compareAtPrice}
-            onChange={(e) => set("compareAtPrice", e.target.value)}
+            onChange={(e) => set("compareAtPrice", sanitizePositiveDecimal(e.target.value))}
+            onKeyDown={(e) => {
+              if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
+            }}
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
             hint="Original price used to show a discount"
             placeholder="129.00"
           />
@@ -488,13 +496,12 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
                   {formatPrice(Number(form.compareAtPrice))}
                 </span>
                 <Badge variant="destructive">
-                  -
                   {Math.round(
                     ((Number(form.compareAtPrice) - Number(form.price)) /
                       Number(form.compareAtPrice)) *
                       100
                   )}
-                  %
+                  % off
                 </Badge>
               </>
             )}
@@ -512,19 +519,27 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
           />
           <Input
             label="Stock quantity"
-            type="number"
-            min="0"
+            type="text"
+            inputMode="numeric"
             value={form.stock}
-            onChange={(e) => set("stock", e.target.value)}
+            onChange={(e) => set("stock", sanitizeWholeNumber(e.target.value))}
+            onKeyDown={(e) => {
+              if (["-", "+", "e", "E", "."].includes(e.key)) e.preventDefault();
+            }}
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
             error={fieldErrors.stock}
             placeholder="50"
           />
           <Input
             label="Display position"
-            type="number"
-            min="0"
+            type="text"
+            inputMode="numeric"
             value={form.position}
-            onChange={(e) => set("position", e.target.value)}
+            onChange={(e) => set("position", sanitizeWholeNumber(e.target.value))}
+            onKeyDown={(e) => {
+              if (["-", "+", "e", "E", "."].includes(e.key)) e.preventDefault();
+            }}
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
             hint="Lower = shown first. 0 = default order."
             placeholder="0"
           />

@@ -6,12 +6,28 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatPrice(amount: number) {
+  const safe = Number.isFinite(amount) ? Math.max(0, amount) : 0;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    minimumFractionDigits: safe % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(safe);
+}
+
+/** Keep only a positive decimal string for price inputs (no minus sign). */
+export function sanitizePositiveDecimal(raw: string): string {
+  let value = raw.replace(/[^\d.]/g, "");
+  const dotIndex = value.indexOf(".");
+  if (dotIndex !== -1) {
+    value = `${value.slice(0, dotIndex + 1)}${value.slice(dotIndex + 1).replace(/\./g, "")}`;
+  }
+  return value;
+}
+
+/** Keep only a non-negative whole number string for stock/quantity inputs. */
+export function sanitizeWholeNumber(raw: string): string {
+  return raw.replace(/\D/g, "");
 }
 
 export function formatNumber(value: number) {

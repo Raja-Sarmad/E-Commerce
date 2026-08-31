@@ -4,8 +4,9 @@ import type { Order, OrderStatus, OrderItem, User } from "../types";
 
 export type AuthResponse = User;
 
-type RegisterPayload = { name: string; email: string; password: string; phone?: string };
+type RegisterPayload = { name: string; email: string; password: string; phone: string; otp: string };
 type LoginPayload = { email: string; password: string };
+type PhoneOtpResponse = { sent: boolean; devMode?: boolean; devOtp?: string };
 
 export function normalizeOrder(raw: Record<string, unknown>): Order {
   const rawItems = Array.isArray(raw.items) ? (raw.items as Array<Record<string, unknown>>) : [];
@@ -80,7 +81,11 @@ export const authApi = baseApi.injectEndpoints({
     }),
     logout: builder.mutation<void, void>({
       query: () => ({ url: "/auth/logout", method: "POST" }),
-      invalidatesTags: ["Auth"],
+    }),
+    sendPhoneOtp: builder.mutation<PhoneOtpResponse, { phone: string }>({
+      query: (body) => ({ url: "/auth/phone-otp", method: "POST", body }),
+      transformResponse: (raw: unknown) =>
+        ((raw as { data?: PhoneOtpResponse })?.data ?? raw) as PhoneOtpResponse,
     }),
     getMe: builder.query<User | null, void>({
       query: () => ({ url: "/users/me" }),
@@ -112,6 +117,7 @@ export const authApi = baseApi.injectEndpoints({
 export const {
   useLoginMutation,
   useRegisterMutation,
+  useSendPhoneOtpMutation,
   useLogoutMutation,
   useGetMeQuery,
   useUpdateProfileMutation,

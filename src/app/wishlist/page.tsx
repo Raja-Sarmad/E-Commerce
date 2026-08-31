@@ -11,7 +11,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { AuthRequiredModal } from "@/components/ui/AuthRequiredModal";
 import { selectWishlistItems, removeFromWishlist } from "@/lib/rtk/wishlistSlice";
-import { selectIsInCart } from "@/lib/rtk/cartSlice";
+import {
+  addItem,
+  selectIsInCart,
+  selectCartItems,
+  validateCartQuantity,
+} from "@/lib/rtk/cartSlice";
+import { toast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
+import type { Product } from "@/lib/types";
 import { formatPrice, cn } from "@/lib/utils";
 
 export default function WishlistPage() {
@@ -44,14 +53,7 @@ export default function WishlistPage() {
   );
 }
 
-import { addItem, selectIsInCart, selectCartItems, validateCartQuantity } from "@/lib/rtk/cartSlice";
-import { toast } from "@/hooks/use-toast";
-import { type Product } from "@/lib/types";
-import { selectCartCount } from "@/lib/rtk/cartSlice";
-import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useGetMeQuery } from "@/lib/rtk/authApi";
-
-function WishlistCard({ product, dispatch }: { product: Product; dispatch: any }) {
+function WishlistCard({ product, dispatch }: { product: Product; dispatch: ReturnType<typeof useDispatch> }) {
   const inCart = useSelector(selectIsInCart(product.id));
   const cartItems = useSelector(selectCartItems);
   const { isAdmin } = useIsAdmin();

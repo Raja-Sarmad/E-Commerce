@@ -31,6 +31,72 @@ type CartState = {
   coupon: Coupon | null;
 };
 
+export type CartStockCheck =
+  | { ok: true; quantity: number }
+  | { ok: false; title: string; message: string };
+
+function findCartLine(
+  items: CartItem[],
+  productId: string,
+  color?: string,
+  size?: string
+) {
+  return items.find(
+    (item) =>
+      item.product.id === productId &&
+      item.color === color &&
+      item.size === size
+  );
+}
+
+export function validateCartQuantity(
+  items: CartItem[],
+  product: Product,
+  requestedQty: number,
+  mode: "add" | "set",
+  color?: string,
+  size?: string
+): CartStockCheck {
+  const stock = Math.max(0, product.stock ?? 0);
+
+  if (stock === 0) {
+    return {
+      ok: false,
+      title: "No stock available",
+      message: "This product is currently out of stock.",
+    };
+  }
+
+  const existing = findCartLine(items, product.id, color, size);
+  const inCart = existing?.quantity ?? 0;
+  const targetQty = mode === "add" ? inCart + requestedQty : requestedQty;
+
+  if (targetQty <= stock) {
+    return { ok: true, quantity: targetQty };
+  }
+
+  if (inCart >= stock) {
+    return {
+      ok: false,
+      title: "No stock available",
+      message:
+        stock === 1
+          ? "Only 1 item in stock and it is already in your cart."
+          : `Only ${stock} in stock and all are already in your cart.`,
+    };
+  }
+
+  const remaining = stock - inCart;
+  return {
+    ok: false,
+    title: "No stock available",
+    message:
+      remaining === 1
+        ? "Only 1 more item can be added to your cart."
+        : `Only ${remaining} more can be added (${stock} in stock).`,
+  };
+}
+
 const initialState: CartState = {
   items: [],
   coupon: null,
@@ -53,16 +119,19 @@ const cartSlice = createSlice({
       }>
     ) => {
       const { product, quantity = 1, color, size } = action.payload;
-      const existing = state.items.find(
-        (i) =>
-          i.product.id === product.id &&
-          i.color === color &&
-          i.size === size
-      );
+      const stock = Math.max(0, product.stock ?? 0);
+      if (stock === 0) return;
+
+      const existing = findCartLine(state.items, product.id, color, size);
       if (existing) {
-        existing.quantity = Math.min(existing.quantity + quantity, 99);
+        existing.quantity = Math.min(existing.quantity + quantity, stock);
       } else {
-        state.items.push({ product, quantity, color, size });
+        state.items.push({
+          product,
+          quantity: Math.min(quantity, stock),
+          color,
+          size,
+        });
       }
       writeStorage(state.items);
     },
@@ -72,11 +141,14 @@ const cartSlice = createSlice({
     ) => {
       const { productId, quantity } = action.payload;
       state.items = state.items
-        .map((i) =>
-          i.product.id === productId
-            ? { ...i, quantity: Math.max(0, Math.min(quantity, 99)) }
-            : i
-        )
+        .map((i) => {
+          if (i.product.id !== productId) return i;
+          const stock = Math.max(0, i.product.stock ?? 0);
+          return {
+            ...i,
+            quantity: Math.max(0, Math.min(quantity, stock)),
+          };
+        })
         .filter((i) => i.quantity > 0);
       writeStorage(state.items);
     },

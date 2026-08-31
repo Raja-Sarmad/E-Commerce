@@ -27,6 +27,7 @@ import {
   clearCart,
   applyCoupon,
   removeCoupon,
+  validateCartQuantity,
 } from "@/lib/rtk/cartSlice";
 import { useValidateCouponMutation } from "@/lib/rtk/storefrontApi";
 import { toast } from "@/hooks/use-toast";
@@ -192,7 +193,26 @@ export default function CartPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity + 1 }))}
+                          onClick={() => {
+                            const check = validateCartQuantity(
+                              items,
+                              item.product,
+                              item.quantity + 1,
+                              "set",
+                              item.color,
+                              item.size
+                            );
+                            if (!check.ok) {
+                              toast.warning(check.title, check.message);
+                              return;
+                            }
+                            dispatch(
+                              updateQuantity({
+                                productId: item.product.id,
+                                quantity: item.quantity + 1,
+                              })
+                            );
+                          }}
                           aria-label="Increase quantity"
                           className="p-2 text-muted-foreground transition-colors hover:text-foreground"
                         >

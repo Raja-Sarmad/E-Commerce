@@ -7,8 +7,9 @@ import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductImage } from "@/components/ui/ProductImage";
-import { selectCartItems, selectCartCount, selectCartTotals, updateQuantity, removeItem } from "@/lib/rtk/cartSlice";
+import { selectCartItems, selectCartCount, selectCartTotals, updateQuantity, removeItem, validateCartQuantity } from "@/lib/rtk/cartSlice";
 import { formatPrice } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 type CartDrawerProps = {
   open: boolean;
@@ -135,9 +136,26 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     </span>
                     <button
                       type="button"
-                      onClick={() =>
-                        dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity + 1 }))
-                      }
+                      onClick={() => {
+                        const check = validateCartQuantity(
+                          items,
+                          item.product,
+                          item.quantity + 1,
+                          "set",
+                          item.color,
+                          item.size
+                        );
+                        if (!check.ok) {
+                          toast.warning(check.title, check.message);
+                          return;
+                        }
+                        dispatch(
+                          updateQuantity({
+                            productId: item.product.id,
+                            quantity: item.quantity + 1,
+                          })
+                        );
+                      }}
                       aria-label="Increase quantity"
                       className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"
                     >

@@ -23,6 +23,8 @@ import {
   addItem,
   updateQuantity,
   selectIsInCart,
+  selectCartItems,
+  validateCartQuantity,
 } from "@/lib/rtk/cartSlice";
 import { toggleWishlist, selectIsInWishlist } from "@/lib/rtk/wishlistSlice";
 import { toggleCompare, selectIsInCompare } from "@/lib/rtk/compareSlice";
@@ -42,6 +44,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const { isAdmin } = useIsAdmin();
   const { data: user } = useGetMeQuery();
   const inCart = useSelector(selectIsInCart(product.id));
+  const cartItems = useSelector(selectCartItems);
   const wishlisted = useSelector(selectIsInWishlist(product.id));
   const compared = useSelector(selectIsInCompare(product.id));
   const router = useRouter();
@@ -53,6 +56,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const outOfStock = product.stock === 0;
+  const maxQuantity = Math.max(0, product.stock ?? 0);
   const discount = product.compareAtPrice
     ? Math.round(
         ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100
@@ -65,7 +69,19 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
     if (outOfStock) {
-      toast.info("Out of stock", "This product is currently unavailable.");
+      toast.warning("No stock available", "This product is currently out of stock.");
+      return;
+    }
+    const check = validateCartQuantity(
+      cartItems,
+      product,
+      qty,
+      inCart ? "set" : "add",
+      color,
+      size
+    );
+    if (!check.ok) {
+      toast.warning(check.title, check.message);
       return;
     }
     if (inCart) {
@@ -246,7 +262,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               </span>
               <button
                 type="button"
-                onClick={() => setQty((q) => Math.min(99, q + 1))}
+                onClick={() => setQty((q) => Math.min(maxQuantity, q + 1))}
                 aria-label="Increase quantity"
                 className="px-3.5 py-3 text-muted-foreground transition-colors hover:text-foreground"
               >

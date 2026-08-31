@@ -9,7 +9,7 @@ import { Rating } from "@/components/ui/Rating";
 import { Badge } from "@/components/ui/Badge";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { AuthRequiredModal } from "@/components/ui/AuthRequiredModal";
-import { addItem, updateQuantity, selectIsInCart } from "@/lib/rtk/cartSlice";
+import { addItem, updateQuantity, selectIsInCart, selectCartItems, validateCartQuantity } from "@/lib/rtk/cartSlice";
 import { toast } from "@/hooks/use-toast";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
@@ -28,9 +28,11 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
   const { isAdmin } = useIsAdmin();
   const { data: user } = useGetMeQuery();
   const inCart = useSelector(selectIsInCart(product.id));
+  const cartItems = useSelector(selectCartItems);
   const [added, setAdded] = useState(false);
   const [qty, setQty] = useState(1);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const maxQuantity = Math.max(0, product.stock ?? 0);
 
   const discount = product.compareAtPrice
     ? Math.round(
@@ -41,6 +43,20 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
   const handleAdd = () => {
     if (!user) {
       setShowAuthModal(true);
+      return;
+    }
+    if (product.stock === 0) {
+      toast.warning("No stock available", "This product is currently out of stock.");
+      return;
+    }
+    const check = validateCartQuantity(
+      cartItems,
+      product,
+      qty,
+      inCart ? "set" : "add"
+    );
+    if (!check.ok) {
+      toast.warning(check.title, check.message);
       return;
     }
     if (inCart) {
@@ -141,7 +157,7 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setQty((q) => Math.min(99, q + 1))}
+                  onClick={() => setQty((q) => Math.min(maxQuantity, q + 1))}
                   aria-label="Increase quantity"
                   className="px-3 py-2.5 text-muted-foreground transition-colors hover:text-foreground"
                 >

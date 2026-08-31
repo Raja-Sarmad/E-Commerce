@@ -44,7 +44,7 @@ export default function WishlistPage() {
   );
 }
 
-import { addItem } from "@/lib/rtk/cartSlice";
+import { addItem, selectIsInCart, selectCartItems, validateCartQuantity } from "@/lib/rtk/cartSlice";
 import { toast } from "@/hooks/use-toast";
 import { type Product } from "@/lib/types";
 import { selectCartCount } from "@/lib/rtk/cartSlice";
@@ -53,6 +53,7 @@ import { useGetMeQuery } from "@/lib/rtk/authApi";
 
 function WishlistCard({ product, dispatch }: { product: Product; dispatch: any }) {
   const inCart = useSelector(selectIsInCart(product.id));
+  const cartItems = useSelector(selectCartItems);
   const { isAdmin } = useIsAdmin();
   const { data: user } = useGetMeQuery();
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -113,7 +114,13 @@ function WishlistCard({ product, dispatch }: { product: Product; dispatch: any }
                   setShowAuthModal(true);
                   return;
                 }
-                if (!inCart) dispatch(addItem({ product, quantity: 1 }));
+                if (inCart) return;
+                const check = validateCartQuantity(cartItems, product, 1, "add");
+                if (!check.ok) {
+                  toast.warning(check.title, check.message);
+                  return;
+                }
+                dispatch(addItem({ product, quantity: 1 }));
                 toast.success("Added to cart", `${product.name} has been added to your cart.`);
               }}
             >

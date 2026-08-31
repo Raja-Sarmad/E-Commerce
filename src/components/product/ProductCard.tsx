@@ -24,6 +24,7 @@ import {
   selectCartItems,
   selectIsInCart,
   selectCartItemQuantity,
+  validateCartQuantity,
 } from "@/lib/rtk/cartSlice";
 import { toggleWishlist, selectIsInWishlist } from "@/lib/rtk/wishlistSlice";
 import { toggleCompare, selectIsInCompare } from "@/lib/rtk/compareSlice";
@@ -51,7 +52,6 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const [quickView, setQuickView] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const outOfStock = (product.stock ?? 0) === 0;
-  const maxQuantity = Math.min(product.stock ?? 0, 99);
 
   const handleAddToCart = () => {
     if (!user) {
@@ -59,7 +59,12 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
       return;
     }
     if (outOfStock) {
-      toast.info("Out of stock", "This product is currently unavailable.");
+      toast.warning("No stock available", "This product is currently out of stock.");
+      return;
+    }
+    const check = validateCartQuantity(cartItems, product, 1, "add");
+    if (!check.ok) {
+      toast.warning(check.title, check.message);
       return;
     }
     dispatch(addItem({ product }));
@@ -76,8 +81,14 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   };
 
   const handleIncrease = () => {
-    if (cartQuantity >= maxQuantity) {
-      toast.info("Max quantity reached", product.name);
+    const check = validateCartQuantity(
+      cartItems,
+      product,
+      cartQuantity + 1,
+      "set"
+    );
+    if (!check.ok) {
+      toast.warning(check.title, check.message);
       return;
     }
     dispatch(updateQuantity({ productId: product.id, quantity: cartQuantity + 1 }));

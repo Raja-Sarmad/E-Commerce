@@ -4,9 +4,9 @@ import type { Order, OrderStatus, OrderItem, User } from "../types";
 
 export type AuthResponse = User;
 
-type RegisterPayload = { name: string; email: string; password: string; phone: string; otp: string };
+type RegisterPayload = { name: string; email: string; password: string; otp: string };
 type LoginPayload = { email: string; password: string };
-type PhoneOtpResponse = { sent: boolean; devMode?: boolean; devOtp?: string };
+type EmailOtpResponse = { sent: boolean; devMode?: boolean; devOtp?: string };
 
 export function normalizeOrder(raw: Record<string, unknown>): Order {
   const rawItems = Array.isArray(raw.items) ? (raw.items as Array<Record<string, unknown>>) : [];
@@ -82,10 +82,10 @@ export const authApi = baseApi.injectEndpoints({
     logout: builder.mutation<void, void>({
       query: () => ({ url: "/auth/logout", method: "POST" }),
     }),
-    sendPhoneOtp: builder.mutation<PhoneOtpResponse, { phone: string }>({
-      query: (body) => ({ url: "/auth/phone-otp", method: "POST", body }),
+    sendEmailOtp: builder.mutation<EmailOtpResponse, { email: string }>({
+      query: (body) => ({ url: "/auth/email-otp", method: "POST", body }),
       transformResponse: (raw: unknown) =>
-        ((raw as { data?: PhoneOtpResponse })?.data ?? raw) as PhoneOtpResponse,
+        ((raw as { data?: EmailOtpResponse })?.data ?? raw) as EmailOtpResponse,
     }),
     getMe: builder.query<User | null, void>({
       query: () => ({ url: "/users/me" }),
@@ -117,7 +117,7 @@ export const authApi = baseApi.injectEndpoints({
 export const {
   useLoginMutation,
   useRegisterMutation,
-  useSendPhoneOtpMutation,
+  useSendEmailOtpMutation,
   useLogoutMutation,
   useGetMeQuery,
   useUpdateProfileMutation,

@@ -2,19 +2,14 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { FiEye, FiEyeOff, FiLock, FiMail, FiPhone, FiUser } from "react-icons/fi";
+import { FiEye, FiEyeOff, FiLock, FiMail, FiUser } from "react-icons/fi";
 import { AuthShell, AuthFooter } from "@/components/auth/AuthShell";
 import { PasswordRequirements } from "@/components/auth/PasswordRequirements";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { useRegisterMutation, useSendPhoneOtpMutation } from "@/lib/rtk/authApi";
+import { useRegisterMutation, useSendEmailOtpMutation } from "@/lib/rtk/authApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
-import {
-  isPasswordValid,
-  isValidEmail,
-  isValidPhone,
-  passwordValidationMessage,
-} from "@/lib/password-validation";
+import { isPasswordValid, isValidEmail, passwordValidationMessage } from "@/lib/password-validation";
 import { toast } from "@/hooks/use-toast";
 
 function PasswordToggle({
@@ -40,12 +35,11 @@ function PasswordToggle({
 
 export default function RegisterPage() {
   const [registerMutation] = useRegisterMutation();
-  const [sendPhoneOtp] = useSendPhoneOtpMutation();
+  const [sendEmailOtp] = useSendEmailOtpMutation();
   const router = useRouter();
   const [form, setForm] = useState({
     name: "",
     email: "",
-    phone: "",
     otp: "",
     password: "",
     confirm: "",
@@ -55,19 +49,18 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [otpEmail, setOtpEmail] = useState("");
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({
     name: "",
     email: "",
-    phone: "",
     otp: "",
     password: "",
     confirm: "",
   });
   const [touched, setTouched] = useState({
     email: false,
-    phone: false,
     otp: false,
     password: false,
     confirm: false,
@@ -87,12 +80,6 @@ export default function RegisterPage() {
     return "";
   }, [form.email]);
 
-  const phoneError = useMemo(() => {
-    if (!form.phone.trim()) return "";
-    if (!isValidPhone(form.phone)) return "Please enter a valid phone number (10–15 digits).";
-    return "";
-  }, [form.phone]);
-
   const passwordError = useMemo(() => {
     if (!form.password) return "";
     return passwordValidationMessage(form.password) ?? "";
@@ -105,7 +92,7 @@ export default function RegisterPage() {
   }, [form.confirm, form.password]);
 
   const validateForm = () => {
-    const next = { name: "", email: "", phone: "", otp: "", password: "", confirm: "" };
+    const next = { name: "", email: "", otp: "", password: "", confirm: "" };
 
     if (!form.name.trim()) {
       next.name = "Full name is required.";
@@ -119,18 +106,12 @@ export default function RegisterPage() {
       next.email = "Please enter a valid email address.";
     }
 
-    if (!form.phone.trim()) {
-      next.phone = "Phone number is required.";
-    } else if (!isValidPhone(form.phone)) {
-      next.phone = "Please enter a valid phone number (10–15 digits).";
-    }
-
     if (!form.otp.trim()) {
-      next.otp = "Enter the 6-digit OTP sent to your phone.";
+      next.otp = "Enter the 6-digit OTP sent to your email.";
     } else if (!/^\d{6}$/.test(form.otp.trim())) {
       next.otp = "OTP must be a 6-digit code.";
-    } else if (!otpSent) {
-      next.otp = "Send OTP to your phone first.";
+    } else if (!otpSent || otpEmail !== form.email.trim().toLowerCase()) {
+      next.otp = "Send OTP to your email first.";
     }
 
     if (!form.password) {
@@ -146,32 +127,30 @@ export default function RegisterPage() {
     }
 
     setFieldErrors(next);
-    setTouched({ email: true, phone: true, otp: true, password: true, confirm: true });
+    setTouched({ email: true, otp: true, password: true, confirm: true });
     return !Object.values(next).some(Boolean);
   };
 
   const handleSendOtp = async () => {
     setFormError("");
-    if (!form.phone.trim()) {
-      setFieldErrors((prev) => ({ ...prev, phone: "Phone number is required." }));
-      setTouched((prev) => ({ ...prev, phone: true }));
+    if (!form.email.trim()) {
+      setFieldErrors((prev) => ({ ...prev, email: "Email is required." }));
+      setTouched((prev) => ({ ...prev, email: true }));
       return;
     }
-    if (!isValidPhone(form.phone)) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        phone: "Please enter a valid phone number (10–15 digits).",
-      }));
-      setTouched((prev) => ({ ...prev, phone: true }));
+    if (!isValidEmail(form.email)) {
+      setFieldErrors((prev) => ({ ...prev, email: "Please enter a valid email address." }));
+      setTouched((prev) => ({ ...prev, email: true }));
       return;
     }
 
     setOtpLoading(true);
     try {
-      const result = await sendPhoneOtp({ phone: form.phone.trim() }).unwrap();
+      const result = await sendEmailOtp({ email: form.email.trim() }).unwrap();
       setOtpSent(true);
+      setOtpEmail(form.email.trim().toLowerCase());
       setOtpCooldown(60);
-      toast.success("OTP sent", "Check your phone for the verification code.");
+      toast.success("OTP sent", "Check your email for the verification code.");
       if (result.devOtp) {
         toast.info("Dev mode", `Your OTP is ${result.devOtp}`);
       }
@@ -194,7 +173,6 @@ export default function RegisterPage() {
       await registerMutation({
         name: form.name.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
         otp: form.otp.trim(),
         password: form.password,
       }).unwrap();
@@ -236,38 +214,26 @@ export default function RegisterPage() {
           error={fieldErrors.name}
           required
         />
-        <Input
-          label="Email address"
-          type="email"
-          name="email"
-          autoComplete="email"
-          value={form.email}
-          onChange={(e) => {
-            setForm({ ...form, email: e.target.value });
-            if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: "" }));
-          }}
-          onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
-          placeholder="you@example.com"
-          leftIcon={<FiMail className="h-4 w-4" aria-hidden />}
-          error={fieldErrors.email || (touched.email ? emailError : "")}
-          required
-        />
         <div className="space-y-2">
           <Input
-            label="Phone number"
-            type="tel"
-            name="phone"
-            autoComplete="tel"
-            value={form.phone}
+            label="Email address"
+            type="email"
+            name="email"
+            autoComplete="email"
+            value={form.email}
             onChange={(e) => {
-              setForm({ ...form, phone: e.target.value, otp: "" });
-              setOtpSent(false);
-              if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: "" }));
+              const nextEmail = e.target.value;
+              setForm({ ...form, email: nextEmail, otp: "" });
+              if (otpEmail && otpEmail !== nextEmail.trim().toLowerCase()) {
+                setOtpSent(false);
+                setOtpEmail("");
+              }
+              if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: "" }));
             }}
-            onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
-            placeholder="03001234567 or +923001234567"
-            leftIcon={<FiPhone className="h-4 w-4" aria-hidden />}
-            error={fieldErrors.phone || (touched.phone ? phoneError : "")}
+            onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+            placeholder="you@example.com"
+            leftIcon={<FiMail className="h-4 w-4" aria-hidden />}
+            error={fieldErrors.email || (touched.email ? emailError : "")}
             required
           />
           <Button
@@ -282,11 +248,11 @@ export default function RegisterPage() {
               ? `Resend OTP in ${otpCooldown}s`
               : otpSent
                 ? "Resend OTP"
-                : "Send OTP"}
+                : "Send OTP to email"}
           </Button>
         </div>
         <Input
-          label="Phone OTP"
+          label="Email OTP"
           name="otp"
           inputMode="numeric"
           autoComplete="one-time-code"
@@ -296,9 +262,12 @@ export default function RegisterPage() {
             if (fieldErrors.otp) setFieldErrors((prev) => ({ ...prev, otp: "" }));
           }}
           onBlur={() => setTouched((prev) => ({ ...prev, otp: true }))}
-          placeholder="6-digit code"
+          placeholder="6-digit code from email"
           leftIcon={<FiLock className="h-4 w-4" aria-hidden />}
-          error={fieldErrors.otp || (touched.otp && !otpSent ? "Send OTP to your phone first." : "")}
+          error={
+            fieldErrors.otp ||
+            (touched.otp && !otpSent ? "Send OTP to your email first." : "")
+          }
           required
         />
         <div className="space-y-2">

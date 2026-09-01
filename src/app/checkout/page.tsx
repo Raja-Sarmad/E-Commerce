@@ -26,6 +26,7 @@ import {
   selectCartItems,
   selectCartTotals,
   selectCartCoupon,
+  selectCartHydrated,
   clearCart,
 } from "@/lib/rtk/cartSlice";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
@@ -76,6 +77,7 @@ const emptyAddress: Address = {
 export default function CheckoutPage() {
   const dispatch = useDispatch();
   const items = useSelector(selectCartItems);
+  const cartHydrated = useSelector(selectCartHydrated);
   const { subtotal, discount, shipping: cartShipping, tax, total } = useSelector(selectCartTotals);
   const coupon = useSelector(selectCartCoupon);
   const { data: user } = useGetMeQuery();
@@ -212,7 +214,11 @@ export default function CheckoutPage() {
 
       <StepIndicator step={step} />
 
-      {items.length === 0 && step === 1 ? (
+      {!cartHydrated ? (
+        <div className="rounded-2xl border border-border bg-card p-10 text-center">
+          <p className="text-sm text-muted-foreground">Loading checkout...</p>
+        </div>
+      ) : items.length === 0 && step === 1 ? (
         <div className="rounded-2xl border border-border bg-card p-10 text-center">
           <p className="text-lg font-bold text-foreground">Your cart is empty</p>
           <Button href="/shop" className="mt-4">

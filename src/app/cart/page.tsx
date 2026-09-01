@@ -22,6 +22,7 @@ import {
   selectCartItems,
   selectCartTotals,
   selectCartCoupon,
+  selectCartHydrated,
   updateQuantity,
   removeItem,
   clearCart,
@@ -42,6 +43,7 @@ export default function CartPage() {
   const router = useRouter();
   const { isAdmin } = useIsAdmin();
   const items = useSelector(selectCartItems);
+  const cartHydrated = useSelector(selectCartHydrated);
   const { subtotal, discount, shipping, tax, total } = useSelector(selectCartTotals);
   const coupon = useSelector(selectCartCoupon);
   const [validateCoupon] = useValidateCouponMutation();
@@ -84,7 +86,9 @@ export default function CartPage() {
         Shopping Cart
       </h1>
 
-      {items.length === 0 ? (
+      { !cartHydrated ? (
+        <p className="py-8 text-sm text-muted-foreground">Loading your cart...</p>
+      ) : items.length === 0 ? (
         <EmptyState
           icon={<FiShoppingBag className="h-7 w-7" aria-hidden />}
           title="Your cart is empty"

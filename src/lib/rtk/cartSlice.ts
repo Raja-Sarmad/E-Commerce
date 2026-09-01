@@ -29,6 +29,7 @@ function writeStorage(items: CartItem[]) {
 type CartState = {
   items: CartItem[];
   coupon: Coupon | null;
+  hydrated: boolean;
 };
 
 export type CartStockCheck =
@@ -100,6 +101,7 @@ export function validateCartQuantity(
 const initialState: CartState = {
   items: [],
   coupon: null,
+  hydrated: false,
 };
 
 const cartSlice = createSlice({
@@ -108,6 +110,7 @@ const cartSlice = createSlice({
   reducers: {
     hydrateCart: (state) => {
       state.items = readStorage();
+      state.hydrated = true;
     },
     addItem: (
       state,
@@ -200,6 +203,7 @@ export const {
 export default cartSlice.reducer;
 
 export const selectCartItems = (state: RootState) => state.cart.items;
+export const selectCartHydrated = (state: RootState) => state.cart.hydrated;
 export const selectCartCoupon = (state: RootState) => state.cart.coupon;
 
 export const selectCartCount = (state: RootState) =>

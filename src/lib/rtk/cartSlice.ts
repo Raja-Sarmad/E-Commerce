@@ -172,18 +172,33 @@ const cartSlice = createSlice({
     },
     syncCartStock: (state, action: PayloadAction<Record<string, number>>) => {
       const stockMap = action.payload;
-      state.items = state.items
+      let changed = false;
+
+      const nextItems = state.items
         .map((item) => {
           const live = stockMap[item.product.id];
           if (live === undefined) return item;
           const stock = Math.max(0, live);
+          const quantity = Math.min(item.quantity, stock);
+          if (item.product.stock === stock && item.quantity === quantity) {
+            return item;
+          }
+          changed = true;
           return {
             ...item,
             product: { ...item.product, stock },
-            quantity: Math.min(item.quantity, stock),
+            quantity,
           };
         })
         .filter((item) => item.quantity > 0);
+
+      if (nextItems.length !== state.items.length) {
+        changed = true;
+      }
+
+      if (!changed) return;
+
+      state.items = nextItems;
       writeStorage(state.items);
     },
   },

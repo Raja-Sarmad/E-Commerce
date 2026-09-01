@@ -6,7 +6,8 @@ import { FiSave, FiUser } from "react-icons/fi";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { Select } from "@/components/ui/Select";
+import { CountrySelect } from "@/components/ui/CountrySelect";
+import { DEFAULT_COUNTRY } from "@/lib/countries";
 import { Button } from "@/components/ui/Button";
 import { useGetMeQuery, useUpdateProfileMutation } from "@/lib/rtk/authApi";
 import { toast } from "@/hooks/use-toast";
@@ -26,7 +27,7 @@ export default function EditProfilePage() {
     city: user?.address?.city ?? "",
     state: user?.address?.state ?? "",
     zip: user?.address?.zip ?? "",
-    country: user?.address?.country ?? "",
+    country: user?.address?.country ?? DEFAULT_COUNTRY,
   });
   const [saving, setSaving] = useState(false);
 
@@ -147,25 +148,12 @@ export default function EditProfilePage() {
                 onChange={(e) => setForm({ ...form, zip: e.target.value })}
               />
             </div>
-            <Select
+            <CountrySelect
               label="Country"
-              name="country"
               value={form.country}
-              onChange={(e) => setForm({ ...form, country: e.target.value })}
+              onChange={(country) => setForm({ ...form, country })}
               containerClassName="sm:col-span-2"
-            >
-              {[
-                "United States",
-                "Canada",
-                "United Kingdom",
-                "Germany",
-                "Australia",
-              ].map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
         </Card>
 

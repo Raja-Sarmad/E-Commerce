@@ -17,7 +17,8 @@ import {
 import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { CountrySelect } from "@/components/ui/CountrySelect";
+import { DEFAULT_COUNTRY } from "@/lib/countries";
 import { Button } from "@/components/ui/Button";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { useSelector, useDispatch } from "react-redux";
@@ -68,7 +69,7 @@ const emptyAddress: Address = {
   city: "",
   state: "",
   zip: "",
-  country: "United States",
+  country: DEFAULT_COUNTRY,
   phone: "",
 };
 
@@ -235,11 +236,11 @@ export default function CheckoutPage() {
                     <Input label="City" value={shippingAddress.city} onChange={(e) => updateAddress(setShippingAddress, "city", e.target.value)} placeholder="Austin" />
                     <Input label="State / Province" value={shippingAddress.state} onChange={(e) => updateAddress(setShippingAddress, "state", e.target.value)} placeholder="TX" />
                     <Input label="ZIP / Postal code" value={shippingAddress.zip} onChange={(e) => updateAddress(setShippingAddress, "zip", e.target.value)} placeholder="73301" />
-                    <Select label="Country" value={shippingAddress.country} onChange={(e) => updateAddress(setShippingAddress, "country", e.target.value)}>
-                      {["United States", "Canada", "United Kingdom", "Australia", "Germany", "France"].map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </Select>
+                    <CountrySelect
+                      label="Country"
+                      value={shippingAddress.country}
+                      onChange={(value) => updateAddress(setShippingAddress, "country", value)}
+                    />
                     <Input label="Phone" value={shippingAddress.phone} onChange={(e) => updateAddress(setShippingAddress, "phone", e.target.value)} placeholder="+1 555 010 2233" />
                   </div>
                 </section>
@@ -266,7 +267,11 @@ export default function CheckoutPage() {
                       <Input label="City" value={billingAddress.city} onChange={(e) => updateAddress(setBillingAddress, "city", e.target.value)} />
                       <Input label="State" value={billingAddress.state} onChange={(e) => updateAddress(setBillingAddress, "state", e.target.value)} />
                       <Input label="ZIP" value={billingAddress.zip} onChange={(e) => updateAddress(setBillingAddress, "zip", e.target.value)} />
-                      <Input label="Country" value={billingAddress.country} onChange={(e) => updateAddress(setBillingAddress, "country", e.target.value)} />
+                      <CountrySelect
+                        label="Country"
+                        value={billingAddress.country}
+                        onChange={(value) => updateAddress(setBillingAddress, "country", value)}
+                      />
                     </div>
                   )}
                 </section>

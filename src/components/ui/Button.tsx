@@ -25,6 +25,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
   href?: string;
+  target?: string;
+  rel?: string;
 };
 
 const variantClasses: Record<Variant, string> = {
@@ -61,6 +63,8 @@ export function Button({
   leftIcon,
   rightIcon,
   href,
+  target,
+  rel,
   className,
   children,
   disabled,
@@ -77,7 +81,12 @@ export function Button({
 
   if (href) {
     return (
-      <Link href={href} className={classes}>
+      <Link
+        href={href}
+        className={classes}
+        target={target}
+        rel={target === "_blank" ? rel ?? "noopener noreferrer" : rel}
+      >
         {leftIcon}
         {children}
         {rightIcon}

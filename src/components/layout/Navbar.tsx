@@ -28,9 +28,10 @@ import {
 } from "@/lib/rtk/authApi";
 import { selectCartCount } from "@/lib/rtk/cartSlice";
 import { selectWishlistItems } from "@/lib/rtk/wishlistSlice";
-import { navLinks } from "@/lib/site";
+import { navLinks, siteConfig } from "@/lib/site";
 import { useGetStorefrontCategoriesQuery } from "@/lib/rtk/storefrontApi";
-import { cn } from "@/lib/utils";
+import { CurrencySelector } from "@/components/layout/CurrencySelector";
+import { cn, formatPrice } from "@/lib/utils";
 
 export function Navbar() {
   const cartCount = useSelector(selectCartCount);
@@ -131,6 +132,8 @@ export function Navbar() {
                     <FiSun className="h-5 w-5" aria-hidden />
                   )}
                 </button>
+
+                <CurrencySelector compact className="hidden sm:block" />
 
                 <Link
                   href="/wishlist"
@@ -322,7 +325,7 @@ function PromoPill() {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
       </span>
-      Free shipping over $100
+      Free shipping over {formatPrice(siteConfig.freeShippingThreshold)}
     </span>
   );
 }

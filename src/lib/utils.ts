@@ -1,18 +1,15 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+import { formatAmount, type CurrencyCode } from "./currency";
+import { getActiveCurrencyCode } from "./rtk/currency-bridge";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(amount: number) {
-  const safe = Number.isFinite(amount) ? Math.max(0, amount) : 0;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: safe % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(safe);
+export function formatPrice(amount: number, currencyCode?: CurrencyCode) {
+  return formatAmount(amount, currencyCode ?? getActiveCurrencyCode());
 }
 
 /** Keep only a positive decimal string for price inputs (no minus sign). */

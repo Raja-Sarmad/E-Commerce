@@ -9,6 +9,7 @@ import { Logo } from "./Logo";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { useGetStorefrontCategoriesQuery } from "@/lib/rtk/storefrontApi";
 import { navLinks } from "@/lib/site";
+import { CurrencySelector } from "@/components/layout/CurrencySelector";
 import { cn } from "@/lib/utils";
 
 type MobileNavProps = {
@@ -32,6 +33,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
       subtitle="Explore NovaMart"
     >
       <div className="flex flex-col gap-6">
+        <CurrencySelector />
         {!user && (
           <Link
             href="/login"

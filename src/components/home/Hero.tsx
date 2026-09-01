@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { Badge } from "@/components/ui/Badge";
+import { FreeShippingText } from "@/components/ui/FreeShippingText";
 
 const slides = [
   {
@@ -102,7 +103,9 @@ export function Hero() {
                     <p className="text-[10px] uppercase tracking-wide text-white/70">
                       Free shipping
                     </p>
-                    <p className="text-sm font-bold text-white">On orders $100+</p>
+                    <p className="text-sm font-bold text-white">
+                      <FreeShippingText prefix="On orders " suffix="+" />
+                    </p>
                   </div>
                 </div>
               </div>

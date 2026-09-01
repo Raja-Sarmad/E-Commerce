@@ -12,6 +12,9 @@ import { hydrateAccessToken } from "@/lib/rtk/authSlice";
 const Toaster = dynamic(() => import("@/components/ui/Toaster").then((m) => m.Toaster), { ssr: false });
 import { hydrateWishlist } from "@/lib/rtk/wishlistSlice";
 import { hydrateCompare } from "@/lib/rtk/compareSlice";
+import { hydrateCurrency } from "@/lib/rtk/currencySlice";
+import { bindCurrencyStore } from "@/lib/rtk/currency-bridge";
+import { CurrencyReactivity } from "@/components/layout/CurrencyReactivity";
 
 function HydrateClientState() {
   const dispatch = useDispatch<AppDispatch>();
@@ -20,6 +23,7 @@ function HydrateClientState() {
     dispatch(hydrateCart());
     dispatch(hydrateWishlist());
     dispatch(hydrateCompare());
+    dispatch(hydrateCurrency());
   }, [dispatch]);
   return null;
 }
@@ -28,13 +32,14 @@ export function Providers({ children }: { children: ReactNode }) {
   const storeRef = useRef<AppStore | null>(null);
   if (!storeRef.current) {
     storeRef.current = makeStore();
+    bindCurrencyStore(storeRef.current);
   }
 
   return (
     <Provider store={storeRef.current}>
       <QueryClientProvider client={queryClient}>
         <HydrateClientState />
-        {children}
+        <CurrencyReactivity>{children}</CurrencyReactivity>
         <Toaster />
       </QueryClientProvider>
     </Provider>

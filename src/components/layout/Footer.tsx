@@ -22,9 +22,10 @@ import { Logo } from "./Logo";
 import { Input } from "@/components/ui/Input";
 import { toast } from "@/hooks/use-toast";
 import { footerLinks, siteConfig } from "@/lib/site";
+import { FreeShippingText } from "@/components/ui/FreeShippingText";
 
 const benefits = [
-  { icon: FiTruck, title: "Free Shipping", text: "On orders over $100" },
+  { icon: FiTruck, title: "Free Shipping", text: <FreeShippingText /> },
   { icon: FiRefreshCw, title: "Easy Returns", text: "30-day money back" },
   { icon: FiLock, title: "Secure Payment", text: "256-bit SSL encrypted" },
   { icon: FiShield, title: "2-Year Warranty", text: "On all electronics" },

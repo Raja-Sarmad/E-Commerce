@@ -11,15 +11,23 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useCategories, useBrands } from "@/hooks/use-catalog";
-import { cn } from "@/lib/utils";
+import { useSelector } from "react-redux";
+import { selectCurrencyCode } from "@/lib/rtk/currencySlice";
+import { cn, formatPrice } from "@/lib/utils";
 
-const priceBrackets = [
-  { label: "Under $50", min: 0, max: 50 },
-  { label: "$50 – $100", min: 50, max: 100 },
-  { label: "$100 – $250", min: 100, max: 250 },
-  { label: "$250 – $500", min: 250, max: 500 },
-  { label: "Over $500", min: 500, max: Infinity },
-];
+function usePriceBrackets() {
+  const currency = useSelector(selectCurrencyCode);
+  return useMemo(
+    () => [
+      { label: `Under ${formatPrice(50, currency)}`, min: 0, max: 50 },
+      { label: `${formatPrice(50, currency)} – ${formatPrice(100, currency)}`, min: 50, max: 100 },
+      { label: `${formatPrice(100, currency)} – ${formatPrice(250, currency)}`, min: 100, max: 250 },
+      { label: `${formatPrice(250, currency)} – ${formatPrice(500, currency)}`, min: 250, max: 500 },
+      { label: `Over ${formatPrice(500, currency)}`, min: 500, max: Infinity },
+    ],
+    [currency]
+  );
+}
 
 type FilterSidebarProps = {
   onClose?: () => void;
@@ -28,6 +36,7 @@ type FilterSidebarProps = {
 export function FilterSidebar({ onClose }: FilterSidebarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const priceBrackets = usePriceBrackets();
   const { data: categories = [] } = useCategories();
   const { data: brandsData = [] } = useBrands();
   const brands = brandsData.map((b) => b.name);

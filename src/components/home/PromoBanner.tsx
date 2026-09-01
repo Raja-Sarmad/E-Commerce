@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FiArrowRight, FiShield, FiTag, FiTruck } from "react-icons/fi";
 import { Container } from "@/components/ui/Container";
 import { ProductImage } from "@/components/ui/ProductImage";
+import { FreeShippingText } from "@/components/ui/FreeShippingText";
 
 export function PromoBanner() {
   return (
@@ -90,7 +91,7 @@ export function PromoBanner() {
                   Free express delivery
                 </h3>
                 <p className="mt-1 text-xs text-accent-foreground/80">
-                  On orders over $100
+                  <FreeShippingText />
                 </p>
               </Link>
             </div>

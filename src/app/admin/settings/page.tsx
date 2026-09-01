@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { CURRENCY_LIST } from "@/lib/currency";
 import {
   useGetSettingsQuery,
   useUpdateSettingsMutation,
@@ -237,18 +238,16 @@ export default function AdminSettingsPage() {
               Commerce settings
             </h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Select label="Currency" value={form.currency} onChange={(e) => set("currency", e.target.value)}>
-                {[
-                  ["USD", "US Dollar (USD)"],
-                  ["EUR", "Euro (EUR)"],
-                  ["GBP", "British Pound (GBP)"],
-                ].map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+              <Select label="Default store currency" value={form.currency} onChange={(e) => set("currency", e.target.value)}>
+                {CURRENCY_LIST.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.label} ({currency.code})
+                  </option>
                 ))}
               </Select>
               <Input label="Tax rate (%)" type="number" value={form.taxRate} onChange={(e) => set("taxRate", e.target.value)} />
-              <Input label="Free shipping threshold ($)" type="number" value={form.freeShippingThreshold} onChange={(e) => set("freeShippingThreshold", e.target.value)} />
-              <Input label="Standard shipping rate ($)" type="number" value={form.shippingRate} onChange={(e) => set("shippingRate", e.target.value)} />
+              <Input label="Free shipping threshold (USD base)" type="number" value={form.freeShippingThreshold} onChange={(e) => set("freeShippingThreshold", e.target.value)} />
+              <Input label="Standard shipping rate (USD base)" type="number" value={form.shippingRate} onChange={(e) => set("shippingRate", e.target.value)} />
               <Input label="Order number prefix" value={form.orderPrefix} onChange={(e) => set("orderPrefix", e.target.value)} />
               <Select label="Default order status" value={form.defaultOrderStatus} onChange={(e) => set("defaultOrderStatus", e.target.value)}>
                 <option value="pending">Pending</option>

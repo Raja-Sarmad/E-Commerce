@@ -34,6 +34,7 @@ import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { formatPrice, getStockLabel } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { siteConfig } from "@/lib/site";
 import { useLiveStockMap } from "@/components/product/LiveStockProvider";
 
 type ProductDetailsProps = {
@@ -349,7 +350,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
       <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-3">
         {[
-          { icon: FiTruck, title: "Free delivery", text: "On orders over $100" },
+          { icon: FiTruck, title: "Free delivery", text: `On orders over ${formatPrice(siteConfig.freeShippingThreshold)}` },
           { icon: FiRefreshCw, title: "Easy returns", text: "30-day returns" },
           { icon: FiShield, title: "Secure checkout", text: "256-bit SSL" },
         ].map((item) => (

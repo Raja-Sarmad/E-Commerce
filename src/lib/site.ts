@@ -14,7 +14,7 @@ export const siteConfig = {
     youtube: "https://youtube.com",
     linkedin: "https://linkedin.com",
   },
-  currencies: ["USD", "EUR", "GBP"],
+  currencies: ["USD", "PKR", "CAD", "SAR", "AUD"],
   freeShippingThreshold: 100,
   shippingRate: 12,
   taxRate: 0.08,

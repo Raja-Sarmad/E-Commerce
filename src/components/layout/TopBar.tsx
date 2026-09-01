@@ -2,9 +2,10 @@
 
 import { FiTruck, FiTag } from "react-icons/fi";
 import { siteConfig } from "@/lib/site";
-import { formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 
 export function TopBar() {
+  const formatPrice = useFormatPrice();
   return (
     <div className="bg-foreground text-background">
       <div className="mx-auto flex h-9 max-w-7xl items-center justify-center gap-6 px-4 text-xs font-medium sm:px-6 lg:px-8">

@@ -35,8 +35,8 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useCreateOrderMutation } from "@/lib/rtk/authApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
 import type { Address } from "@/lib/types";
-import { siteConfig } from "@/lib/site";
-import { formatPrice, cn } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
+import { cn } from "@/lib/utils";
 import {
   useSyncCartStock,
   validateCartStockBeforeCheckout,
@@ -75,10 +75,11 @@ const emptyAddress: Address = {
 };
 
 export default function CheckoutClient() {
+  const formatPrice = useFormatPrice();
   const dispatch = useDispatch();
   const items = useSelector(selectCartItems);
   const cartHydrated = useSelector(selectCartHydrated);
-  const { subtotal, discount, shipping: cartShipping, tax, total } = useSelector(selectCartTotals);
+  const { subtotal, discount, shipping: cartShipping, total } = useSelector(selectCartTotals);
   const coupon = useSelector(selectCartCoupon);
   const { data: user } = useGetMeQuery();
   const isAuthenticated = Boolean(user);
@@ -104,6 +105,12 @@ export default function CheckoutClient() {
   useEffect(() => {
     if (isAdmin) router.replace("/admin");
   }, [isAdmin, router]);
+
+  useEffect(() => {
+    if (cartHydrated && !user && !isAdmin) {
+      router.replace("/login?redirect=/checkout");
+    }
+  }, [cartHydrated, user, isAdmin, router]);
 
   useEffect(() => {
     if (items.length === 0 && step > 1) {
@@ -456,7 +463,6 @@ export default function CheckoutClient() {
                 <Row label="Subtotal" value={formatPrice(subtotal)} />
                 {discount > 0 && <Row label="Discount" value={`-${formatPrice(discount)}`} accent />}
                 <Row label="Shipping" value={delivery.price === 0 ? "Free" : formatPrice(delivery.price)} />
-                <Row label="Estimated tax" value={formatPrice(tax + delivery.price * siteConfig.taxRate)} />
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <span className="text-base font-bold text-foreground">Total</span>

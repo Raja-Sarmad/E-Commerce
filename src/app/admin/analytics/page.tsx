@@ -19,7 +19,8 @@ import {
   DonutChart,
   LineChart,
 } from "@/components/admin/charts";
-import { formatPrice, formatNumber, cn } from "@/lib/utils";
+import { formatNumber, cn } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import {
   useGetDashboardOverviewQuery,
   useGetRevenueSeriesQuery,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/rtk/adminApi";
 
 export default function AdminAnalyticsPage() {
+  const formatPrice = useFormatPrice();
   const [range, setRange] = useState("12m");
 
   const monthsParam = range === "12m" ? 12 : range === "30d" ? 1 : range === "7d" ? undefined : undefined;
@@ -163,7 +165,7 @@ export default function AdminAnalyticsPage() {
           <BarChart
             data={revenueByMonth}
             height={240}
-            formatValue={(v) => `$${(v / 1000).toFixed(1)}k`}
+            formatValue={(v) => formatPrice(v)}
           />
         </ChartCard>
 

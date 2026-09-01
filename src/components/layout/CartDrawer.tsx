@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { selectCartItems, selectCartCount, selectCartTotals, updateQuantity, removeItem, validateCartQuantity } from "@/lib/rtk/cartSlice";
-import { formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import { toast } from "@/hooks/use-toast";
 
 type CartDrawerProps = {
@@ -17,6 +17,7 @@ type CartDrawerProps = {
 };
 
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
+  const formatPrice = useFormatPrice();
   const items = useSelector(selectCartItems);
   const count = useSelector(selectCartCount);
   const { subtotal } = useSelector(selectCartTotals);

@@ -2,34 +2,24 @@ import { createSelector, createSlice, type PayloadAction } from "@reduxjs/toolki
 import type { CartItem, Coupon, Product } from "../types";
 import { siteConfig } from "../site";
 import type { RootState } from "./store";
+import {
+  clearGuestCartStorage,
+  persistCartOwnerId,
+  readStoredCart,
+  readStoredCartOwnerId,
+  writeStoredCart,
+} from "./cart-storage";
 
-const STORAGE_KEY = "novamart-cart";
-
-function readStorage(): CartItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as CartItem[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStorage(items: CartItem[]) {
-  if (typeof window === "undefined") return;
-  if (items.length > 0) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  } else {
-    window.localStorage.removeItem(STORAGE_KEY);
-  }
+function persistCart(state: CartState) {
+  if (!state.ownerId) return;
+  writeStoredCart(state.ownerId, state.items, state.coupon);
 }
 
 type CartState = {
   items: CartItem[];
   coupon: Coupon | null;
   hydrated: boolean;
+  ownerId: string | null;
 };
 
 export type CartStockCheck =
@@ -102,6 +92,7 @@ const initialState: CartState = {
   items: [],
   coupon: null,
   hydrated: false,
+  ownerId: null,
 };
 
 const cartSlice = createSlice({
@@ -109,8 +100,46 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     hydrateCart: (state) => {
-      state.items = readStorage();
+      clearGuestCartStorage();
+      const ownerId = readStoredCartOwnerId();
+      if (!ownerId) {
+        state.ownerId = null;
+        state.items = [];
+        state.coupon = null;
+        state.hydrated = true;
+        return;
+      }
+      const stored = readStoredCart(ownerId);
+      state.ownerId = ownerId;
+      state.items = stored.items;
+      state.coupon = stored.coupon;
       state.hydrated = true;
+    },
+    switchCartOwner: (state, action: PayloadAction<string | null>) => {
+      const nextOwnerId = action.payload;
+
+      if (state.ownerId && state.ownerId !== nextOwnerId) {
+        writeStoredCart(state.ownerId, state.items, state.coupon);
+      }
+
+      if (!nextOwnerId) {
+        state.ownerId = null;
+        state.items = [];
+        state.coupon = null;
+        state.hydrated = true;
+        clearGuestCartStorage();
+        persistCartOwnerId(null);
+        return;
+      }
+
+      if (state.ownerId === nextOwnerId) return;
+
+      const stored = readStoredCart(nextOwnerId);
+      state.ownerId = nextOwnerId;
+      state.items = stored.items;
+      state.coupon = stored.coupon;
+      state.hydrated = true;
+      persistCartOwnerId(nextOwnerId);
     },
     addItem: (
       state,
@@ -121,6 +150,8 @@ const cartSlice = createSlice({
         size?: string;
       }>
     ) => {
+      if (!state.ownerId) return;
+
       const { product, quantity = 1, color, size } = action.payload;
       const stock = Math.max(0, product.stock ?? 0);
       if (stock === 0) return;
@@ -136,7 +167,7 @@ const cartSlice = createSlice({
           size,
         });
       }
-      writeStorage(state.items);
+      persistCart(state);
     },
     updateQuantity: (
       state,
@@ -153,22 +184,24 @@ const cartSlice = createSlice({
           };
         })
         .filter((i) => i.quantity > 0);
-      writeStorage(state.items);
+      persistCart(state);
     },
     removeItem: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((i) => i.product.id !== action.payload);
-      writeStorage(state.items);
+      persistCart(state);
     },
     clearCart: (state) => {
       state.items = [];
       state.coupon = null;
-      writeStorage(state.items);
+      persistCart(state);
     },
     applyCoupon: (state, action: PayloadAction<Coupon>) => {
       state.coupon = action.payload;
+      persistCart(state);
     },
     removeCoupon: (state) => {
       state.coupon = null;
+      persistCart(state);
     },
     syncCartStock: (state, action: PayloadAction<Record<string, number>>) => {
       const stockMap = action.payload;
@@ -199,13 +232,14 @@ const cartSlice = createSlice({
       if (!changed) return;
 
       state.items = nextItems;
-      writeStorage(state.items);
+      persistCart(state);
     },
   },
 });
 
 export const {
   hydrateCart,
+  switchCartOwner,
   addItem,
   updateQuantity,
   removeItem,
@@ -242,13 +276,12 @@ export const selectCartTotals = createSelector(
       subtotal - discount >= siteConfig.freeShippingThreshold || subtotal === 0
         ? 0
         : siteConfig.shippingRate;
-    const tax = (subtotal - discount) * siteConfig.taxRate;
     return {
       subtotal,
       discount,
       shipping,
-      tax,
-      total: subtotal - discount + shipping + tax,
+      tax: 0,
+      total: subtotal - discount + shipping,
     };
   }
 );

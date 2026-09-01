@@ -22,7 +22,8 @@ import {
   useDeleteVendorMutation,
 } from "@/lib/rtk/adminApi";
 import type { AdminVendor } from "@/lib/rtk/adminApi";
-import { formatDate, formatPrice } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 
 const PER_PAGE = 8;
 
@@ -89,6 +90,7 @@ function StatCard({
 }
 
 export default function AdminVendorsPage() {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);

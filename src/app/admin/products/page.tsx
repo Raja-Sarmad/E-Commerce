@@ -19,12 +19,13 @@ import {
   useDeleteProductMutation,
 } from "@/lib/rtk/adminApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
-import { formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import type { Product } from "@/lib/types";
 
 const PER_PAGE = 8;
 
 export default function AdminProductsPage() {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [stock, setStock] = useState("all");

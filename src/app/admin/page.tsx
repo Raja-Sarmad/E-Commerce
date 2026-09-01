@@ -42,7 +42,8 @@ import {
   useGetRecentActivityQuery,
   useGetRevenueComparisonQuery,
 } from "@/lib/rtk/adminApi";
-import { formatPrice, formatNumber, timeAgo } from "@/lib/utils";
+import { formatNumber, timeAgo } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import type { Order } from "@/lib/types";
 import { useMemo } from "react";
 
@@ -60,6 +61,7 @@ const donutColors = [
 ];
 
 export default function AdminDashboardPage() {
+  const formatPrice = useFormatPrice();
   const { data: user } = useGetMeQuery();
 
   const { data: overview } = useGetDashboardOverviewQuery(undefined, POLL_OPTS);
@@ -235,7 +237,7 @@ export default function AdminDashboardPage() {
           <BarChart
             data={revenueSeries}
             height={220}
-            formatValue={(v) => `$${(v / 1000).toFixed(1)}k`}
+            formatValue={(v) => formatPrice(v)}
           />
         </ChartCard>
 

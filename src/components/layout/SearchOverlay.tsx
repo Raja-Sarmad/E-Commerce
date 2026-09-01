@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { FiArrowRight, FiSearch, FiX } from "react-icons/fi";
 import { useSearchProducts } from "@/hooks/use-catalog";
 import { useDebounce } from "@/hooks/use-debounce";
-import { formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import { ProductImage } from "@/components/ui/ProductImage";
 
 type SearchOverlayProps = {
@@ -15,6 +15,7 @@ type SearchOverlayProps = {
 };
 
 export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const router = useRouter();
 

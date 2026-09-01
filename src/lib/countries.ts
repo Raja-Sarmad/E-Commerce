@@ -1,6 +1,21 @@
 /** ISO 3166-1 countries for address forms (generated via Intl.DisplayNames). */
 export type Country = { code: string; name: string };
 
+/** Render a Unicode flag emoji from an ISO 3166-1 alpha-2 code (e.g. PK → 🇵🇰). */
+export function countryCodeToFlag(code: string): string {
+  if (!/^[A-Za-z]{2}$/.test(code)) return "";
+  return code
+    .toUpperCase()
+    .split("")
+    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+    .join("");
+}
+
+export function formatCountryLabel(country: Country): string {
+  const flag = countryCodeToFlag(country.code);
+  return flag ? `${flag} ${country.name}` : country.name;
+}
+
 export const DEFAULT_COUNTRY = "Pakistan";
 
 export const POPULAR_COUNTRIES: Country[] = [

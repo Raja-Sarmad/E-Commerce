@@ -17,7 +17,7 @@ export const siteConfig = {
   currencies: ["USD", "PKR", "CAD", "SAR", "AUD"],
   freeShippingThreshold: 100,
   shippingRate: 12,
-  taxRate: 0.08,
+  taxRate: 0,
 };
 
 export const navLinks = [

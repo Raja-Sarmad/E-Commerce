@@ -6,7 +6,9 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import { AdminFooter } from "@/components/admin/AdminFooter";
 import { Container } from "@/components/ui/Container";
+import { useSelector } from "react-redux";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
+import { selectCurrencyCode } from "@/lib/rtk/currencySlice";
 import { cn } from "@/lib/utils";
 
 const ADMIN_ROLES = ["admin", "super_admin", "manager", "staff"];
@@ -16,6 +18,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const currency = useSelector(selectCurrencyCode);
 
   useEffect(() => {
     if (isLoading) return;
@@ -60,7 +63,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           onToggleCollapse={() => setCollapsed((v) => !v)}
         />
         <main className="flex-1 p-4 lg:p-8">
-          <div className="mx-auto w-full max-w-7xl">{children}</div>
+          <div key={currency} className="mx-auto w-full max-w-7xl">
+            {children}
+          </div>
         </main>
         <AdminFooter />
       </div>

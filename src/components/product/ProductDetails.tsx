@@ -32,7 +32,8 @@ import { toast } from "@/hooks/use-toast";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
-import { formatPrice, getStockLabel } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
+import { getStockLabel } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/lib/site";
 import { useLiveStockMap } from "@/components/product/LiveStockProvider";
@@ -42,6 +43,7 @@ type ProductDetailsProps = {
 };
 
 export function ProductDetails({ product }: ProductDetailsProps) {
+  const formatPrice = useFormatPrice();
   const dispatch = useDispatch();
   const { isAdmin } = useIsAdmin();
   const { data: user } = useGetMeQuery();

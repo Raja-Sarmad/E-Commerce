@@ -25,7 +25,7 @@ import {
   type AdminShippingZone,
   type AdminShippingMethod,
 } from "@/lib/rtk/adminApi";
-import { formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 
 const PER_PAGE = 8;
 
@@ -89,6 +89,7 @@ function Toggle({
 }
 
 export default function AdminShippingPage() {
+  const formatPrice = useFormatPrice();
   const { data: zonesData } = useGetAdminShippingZonesQuery({});
   const { data: methodsData } = useGetAdminShippingMethodsQuery({});
   const [createShippingZone] = useCreateShippingZoneMutation();

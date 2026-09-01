@@ -14,9 +14,6 @@ export function bindCurrencyStore(store: AppStore) {
 }
 
 export function getActiveCurrencyCode(): CurrencyCode {
-  if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
-    return BASE_CURRENCY;
-  }
   if (storeRef) {
     return storeRef.getState().currency.code;
   }

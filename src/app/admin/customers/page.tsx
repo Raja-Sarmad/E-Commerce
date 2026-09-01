@@ -17,7 +17,8 @@ import { ExportButton } from "@/components/admin/ExportButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { useGetUsersQuery } from "@/lib/rtk/adminApi";
-import { formatDate, formatNumber, formatPrice } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import type { User } from "@/lib/types";
 
 const PER_PAGE = 8;
@@ -61,6 +62,7 @@ const defaultExtras = (): CustomerExtras => ({
 type CustomerRow = User & { extras: CustomerExtras };
 
 export default function AdminCustomersPage() {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const [tier, setTier] = useState("all");
   const [status, setStatus] = useState("all");

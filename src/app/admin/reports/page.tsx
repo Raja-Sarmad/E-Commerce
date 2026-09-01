@@ -21,7 +21,8 @@ import { ExportButton } from "@/components/admin/ExportButton";
 import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
 import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { formatPrice, formatNumber } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import {
   useGetSalesReportQuery,
   useGetInventoryReportQuery,
@@ -48,6 +49,7 @@ const reportTypes = [
 type TabKey = (typeof reportTypes)[number]["key"];
 
 export default function AdminReportsPage() {
+  const formatPrice = useFormatPrice();
   const [active, setActive] = useState<TabKey>("sales");
   const [dateRange, setDateRange] = useState<DateRangePreset>("last_month");
 

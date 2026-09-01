@@ -21,7 +21,8 @@ import { toast } from "@/hooks/use-toast";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
-import { formatPrice, cn } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
+import { cn } from "@/lib/utils";
 
 export default function WishlistPage() {
   const dispatch = useDispatch();
@@ -54,6 +55,7 @@ export default function WishlistPage() {
 }
 
 function WishlistCard({ product, dispatch }: { product: Product; dispatch: ReturnType<typeof useDispatch> }) {
+  const formatPrice = useFormatPrice();
   const inCart = useSelector(selectIsInCart(product.id));
   const cartItems = useSelector(selectCartItems);
   const { isAdmin } = useIsAdmin();

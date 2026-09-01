@@ -20,7 +20,8 @@ import {
   useDeleteCouponMutation,
   type AdminCoupon,
 } from "@/lib/rtk/adminApi";
-import { formatDate, formatNumber, formatPrice } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 
 const PER_PAGE = 8;
 
@@ -45,6 +46,7 @@ const emptyForm: CouponForm = {
 };
 
 export default function AdminCouponsPage() {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
   const [page, setPage] = useState(1);

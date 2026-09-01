@@ -32,7 +32,8 @@ import { toast } from "@/hooks/use-toast";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
-import { formatPrice, getStockLabel } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
+import { getStockLabel } from "@/lib/utils";
 import { useLiveStock } from "@/components/product/LiveStockProvider";
 import { useMounted } from "@/hooks/use-mounted";
 
@@ -42,6 +43,7 @@ type ProductCardProps = {
 };
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
+  const formatPrice = useFormatPrice();
   const mounted = useMounted();
   const dispatch = useDispatch();
   const cartItems = useSelector(selectCartItems);

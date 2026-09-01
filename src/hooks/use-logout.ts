@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { useLogoutMutation } from "@/lib/rtk/authApi";
 import { clearAuthCookies } from "@/lib/rtk/authSlice";
+import { switchCartOwner } from "@/lib/rtk/cartSlice";
 import { baseApi } from "@/lib/rtk/baseApi";
 
 export function useLogout() {
@@ -22,6 +23,7 @@ export function useLogout() {
       } catch {
         // Clear local session even if the API call fails
       } finally {
+        dispatch(switchCartOwner(null));
         dispatch(clearAuthCookies());
         dispatch(baseApi.util.resetApiState());
         busyRef.current = false;

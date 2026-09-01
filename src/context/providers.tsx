@@ -15,6 +15,7 @@ import { hydrateCompare } from "@/lib/rtk/compareSlice";
 import { hydrateCurrency } from "@/lib/rtk/currencySlice";
 import { bindCurrencyStore } from "@/lib/rtk/currency-bridge";
 import { CurrencyReactivity } from "@/components/layout/CurrencyReactivity";
+import { CartOwnerSync } from "@/components/cart/CartOwnerSync";
 
 function HydrateClientState() {
   const dispatch = useDispatch<AppDispatch>();
@@ -46,6 +47,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <Provider store={storeRef.current}>
       <QueryClientProvider client={queryClient}>
         <HydrateClientState />
+        <CartOwnerSync />
         <CurrencyReactivity>{children}</CurrencyReactivity>
         <Toaster />
       </QueryClientProvider>

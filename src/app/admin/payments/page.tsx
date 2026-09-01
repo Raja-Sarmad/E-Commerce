@@ -22,7 +22,8 @@ import {
   type AdminPaymentMethod,
   type AdminTransaction,
 } from "@/lib/rtk/adminApi";
-import { formatPrice, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 
 const PER_PAGE = 8;
 
@@ -51,6 +52,7 @@ function prettyKey(key: string) {
 }
 
 export default function AdminPaymentsPage() {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [dateRange, setDateRange] = useState<DateRangePreset>("all");

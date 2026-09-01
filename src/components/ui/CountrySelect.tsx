@@ -5,6 +5,7 @@ import {
   COUNTRIES,
   DEFAULT_COUNTRY,
   POPULAR_COUNTRIES,
+  formatCountryLabel,
 } from "@/lib/countries";
 
 type CountrySelectProps = {
@@ -43,14 +44,14 @@ export function CountrySelect({
       <optgroup label="Popular">
         {POPULAR_COUNTRIES.map((country) => (
           <option key={country.code} value={country.name}>
-            {country.name}
+            {formatCountryLabel(country)}
           </option>
         ))}
       </optgroup>
       <optgroup label="All countries">
         {rest.map((country) => (
           <option key={country.code} value={country.name}>
-            {country.name}
+            {formatCountryLabel(country)}
           </option>
         ))}
       </optgroup>

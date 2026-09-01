@@ -15,7 +15,6 @@ import {
   FiChevronDown,
   FiCreditCard,
   FiExternalLink,
-  FiGlobe,
   FiHome,
   FiImage,
   FiLogOut,
@@ -40,6 +39,7 @@ import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { useLogout } from "@/hooks/use-logout";
 import { useTheme } from "@/hooks/use-theme";
+import { CurrencySelector } from "@/components/layout/CurrencySelector";
 import { cn, timeAgo } from "@/lib/utils";
 import {
   useGetAdminNotificationsQuery,
@@ -98,13 +98,6 @@ function Popover({
   );
 }
 
-const languages = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "Français" },
-  { code: "es", label: "Español" },
-  { code: "ar", label: "العربية" },
-];
-
 const quickActions = [
   { label: "Add product", href: "/admin/products/new", icon: FiPackage },
   { label: "New order", href: "/admin/orders", icon: FiShoppingBag },
@@ -132,21 +125,18 @@ export function AdminTopbar({
   const [notifOpen, setNotifOpen] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [langOpen, setLangOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const msgRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const langRef = useRef<HTMLDivElement>(null);
   const quickRef = useRef<HTMLDivElement>(null);
 
   useClickOutside([searchRef], () => setSearchOpen(false), searchOpen);
   useClickOutside([notifRef], () => setNotifOpen(false), notifOpen);
   useClickOutside([msgRef], () => setMsgOpen(false), msgOpen);
   useClickOutside([profileRef], () => setProfileOpen(false), profileOpen);
-  useClickOutside([langRef], () => setLangOpen(false), langOpen);
   useClickOutside([quickRef], () => setQuickOpen(false), quickOpen);
 
   const { data: notifData } = useGetAdminNotificationsQuery({ limit: 8 });
@@ -294,45 +284,16 @@ export function AdminTopbar({
           </ul>
         </Popover>
 
-        <Popover
-          open={langOpen}
-          onToggle={() => setLangOpen((v) => !v)}
-          refs={[langRef]}
-          width="w-44"
-          trigger={
-            <button
-              type="button"
-              aria-label="Change language"
-              onClick={() => setLangOpen((v) => !v)}
-              className={cn(
-                "rounded-lg p-2 transition-colors hover:bg-muted hover:text-foreground",
-                langOpen ? "bg-muted text-foreground" : "text-muted-foreground"
-              )}
-            >
-              <FiGlobe className="h-5 w-5" aria-hidden />
-            </button>
-          }
+        <span
+          className="hidden items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-2.5 py-2 text-xs font-semibold text-foreground sm:inline-flex"
+          aria-label="Site language: English"
+          title="English"
         >
-          <div className="border-b border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Language
-          </div>
-          <ul className="p-1.5">
-            {languages.map((lang) => (
-              <li key={lang.code}>
-                <button
-                  type="button"
-                  onClick={() => setLangOpen(false)}
-                  className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                >
-                  {lang.label}
-                  {lang.code === "en" && (
-                    <FiCheck className="h-4 w-4 text-primary" aria-hidden />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Popover>
+          <FiCheck className="h-3.5 w-3.5 text-primary" aria-hidden />
+          EN
+        </span>
+
+        <CurrencySelector compact className="hidden sm:block" />
 
         <button
           type="button"

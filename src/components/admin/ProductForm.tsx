@@ -25,8 +25,9 @@ import {
 } from "@/lib/rtk/adminApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { uploadFileToCloudinary } from "@/lib/cloudinary-upload";
-import { slugify, formatPrice, sanitizePositiveDecimal, sanitizeWholeNumber } from "@/lib/utils";
+import { slugify, sanitizePositiveDecimal, sanitizeWholeNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import type { Product } from "@/lib/types";
 
 const maxImageSizeMb = 5;
@@ -154,6 +155,7 @@ const emptyForm = {
 };
 
 export function ProductForm({ initial, mode }: ProductFormProps) {
+  const formatPrice = useFormatPrice();
   const router = useRouter();
   const { data: categoryData, isLoading: categoriesLoading } = useGetAdminCategoriesQuery({});
   const categories = categoryData?.items ?? [];

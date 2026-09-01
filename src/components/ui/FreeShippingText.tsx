@@ -1,7 +1,7 @@
 "use client";
 
 import { siteConfig } from "@/lib/site";
-import { formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 
 type FreeShippingTextProps = {
   prefix?: string;
@@ -14,6 +14,7 @@ export function FreeShippingText({
   suffix = "",
   className,
 }: FreeShippingTextProps) {
+  const formatPrice = useFormatPrice();
   return (
     <span className={className}>
       {prefix}

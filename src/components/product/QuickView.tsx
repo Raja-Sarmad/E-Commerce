@@ -14,7 +14,7 @@ import { toast } from "@/hooks/use-toast";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import { useState } from "react";
 
 type QuickViewProps = {
@@ -24,6 +24,7 @@ type QuickViewProps = {
 };
 
 export function QuickView({ product, open, onClose }: QuickViewProps) {
+  const formatPrice = useFormatPrice();
   const dispatch = useDispatch();
   const { isAdmin } = useIsAdmin();
   const { data: user } = useGetMeQuery();

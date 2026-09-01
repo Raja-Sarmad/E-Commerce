@@ -28,7 +28,8 @@ import {
   useUpdateOrderStatusMutation,
   useAddOrderTrackingMutation,
 } from "@/lib/rtk/adminApi";
-import { formatPrice, formatDate, formatDateLong, cn } from "@/lib/utils";
+import { formatDate, formatDateLong, cn } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 
 const statusSteps = ["pending", "processing", "shipped", "delivered"];
 
@@ -88,6 +89,7 @@ type OrderData = {
 };
 
 export default function AdminOrderDetailPage() {
+  const formatPrice = useFormatPrice();
   const params = useParams<{ number: string }>();
   const router = useRouter();
   const [invoiceOpen, setInvoiceOpen] = useState(false);

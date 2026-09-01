@@ -32,7 +32,8 @@ import { navLinks, siteConfig } from "@/lib/site";
 import { useGetStorefrontCategoriesQuery } from "@/lib/rtk/storefrontApi";
 import { CurrencySelector } from "@/components/layout/CurrencySelector";
 import { useMounted } from "@/hooks/use-mounted";
-import { cn, formatPrice } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
+import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const mounted = useMounted();
@@ -321,6 +322,7 @@ function DesktopNav({ categories }: { categories: any[] }) {
 }
 
 function PromoPill() {
+  const formatPrice = useFormatPrice();
   const mounted = useMounted();
   if (!mounted) {
     return (

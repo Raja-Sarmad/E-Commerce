@@ -28,7 +28,8 @@ import {
   useGetOrdersQuery,
   useUpdateOrderStatusMutation,
 } from "@/lib/rtk/adminApi";
-import { formatPrice, formatNumber, formatDate } from "@/lib/utils";
+import { formatNumber, formatDate } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import type { Order, OrderStatus } from "@/lib/types";
 
 const statusOptions: OrderStatus[] = [
@@ -42,6 +43,7 @@ const statusOptions: OrderStatus[] = [
 const PER_PAGE = 8;
 
 export default function AdminOrdersPage() {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [dateRange, setDateRange] = useState<DateRangePreset>("all");

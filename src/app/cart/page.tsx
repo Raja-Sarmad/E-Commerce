@@ -32,19 +32,23 @@ import {
 } from "@/lib/rtk/cartSlice";
 import { useValidateCouponMutation } from "@/lib/rtk/storefrontApi";
 import { toast } from "@/hooks/use-toast";
+import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { siteConfig } from "@/lib/site";
-import { formatPrice, cn } from "@/lib/utils";
+import { useFormatPrice } from "@/hooks/use-format-price";
+import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useSyncCartStock } from "@/hooks/use-sync-cart-stock";
 
 export default function CartPage() {
+  const formatPrice = useFormatPrice();
   const dispatch = useDispatch();
   const router = useRouter();
   const { isAdmin } = useIsAdmin();
+  const { data: user } = useGetMeQuery();
   const items = useSelector(selectCartItems);
   const cartHydrated = useSelector(selectCartHydrated);
-  const { subtotal, discount, shipping, tax, total } = useSelector(selectCartTotals);
+  const { subtotal, discount, shipping, total } = useSelector(selectCartTotals);
   const coupon = useSelector(selectCartCoupon);
   const [validateCoupon] = useValidateCouponMutation();
   const [mounted, setMounted] = useState(false);
@@ -62,6 +66,12 @@ export default function CartPage() {
   useEffect(() => {
     if (isAdmin) router.replace("/admin");
   }, [isAdmin, router]);
+
+  useEffect(() => {
+    if (mounted && !user && !isAdmin) {
+      router.replace("/login?redirect=/cart");
+    }
+  }, [mounted, user, isAdmin, router]);
 
   const handleApplyCoupon = async () => {
     if (!code.trim()) return;
@@ -278,10 +288,6 @@ export default function CartPage() {
                   <span className={cn("font-semibold", shipping === 0 ? "text-success" : "text-foreground")}>
                     {shipping === 0 ? "Free" : formatPrice(shipping)}
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Estimated tax</span>
-                  <span className="font-semibold text-foreground">{formatPrice(tax)}</span>
                 </div>
               </div>
 

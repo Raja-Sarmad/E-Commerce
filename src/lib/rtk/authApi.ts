@@ -1,5 +1,6 @@
 import { baseApi } from "./baseApi";
 import { normalizeUser, setUser } from "./authSlice";
+import { switchCartOwner } from "./cartSlice";
 import type { Order, OrderStatus, OrderItem, User } from "../types";
 
 export type AuthResponse = User;
@@ -56,6 +57,7 @@ export const authApi = baseApi.injectEndpoints({
           const { data: user } = await queryFulfilled;
           if (user) {
             dispatch(setUser(user));
+            dispatch(switchCartOwner(user.id));
             dispatch(authApi.util.upsertQueryData("getMe", undefined, user));
           }
         } catch {
@@ -72,6 +74,7 @@ export const authApi = baseApi.injectEndpoints({
           const { data: user } = await queryFulfilled;
           if (user) {
             dispatch(setUser(user));
+            dispatch(switchCartOwner(user.id));
             dispatch(authApi.util.upsertQueryData("getMe", undefined, user));
           }
         } catch {

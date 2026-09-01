@@ -34,6 +34,7 @@ import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { formatPrice, getStockLabel } from "@/lib/utils";
 import { useLiveStock } from "@/components/product/LiveStockProvider";
+import { useMounted } from "@/hooks/use-mounted";
 
 type ProductCardProps = {
   product: Product;
@@ -41,6 +42,7 @@ type ProductCardProps = {
 };
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
+  const mounted = useMounted();
   const dispatch = useDispatch();
   const cartItems = useSelector(selectCartItems);
   const inCart = useSelector(selectIsInCart(product.id));
@@ -55,6 +57,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const liveStock = useLiveStock(product.id, product.stock ?? 0);
   const liveProduct = { ...product, stock: liveStock };
   const outOfStock = liveStock === 0;
+  const showInCart = mounted && inCart;
 
   const handleAddToCart = () => {
     if (!user) {
@@ -157,7 +160,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
 
           <div className="absolute inset-x-3 bottom-3 flex translate-y-2 gap-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             {!isAdmin && (
-              inCart ? (
+              showInCart ? (
                 <div className="flex flex-1 items-center justify-between rounded-xl bg-foreground/90 px-1 py-1 text-background backdrop-blur">
                   <button
                     type="button"

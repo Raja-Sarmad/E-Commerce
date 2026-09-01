@@ -86,6 +86,7 @@ export default function CheckoutPage() {
   const [createOrder, { isLoading: creatingOrder }] = useCreateOrderMutation();
   const router = useRouter();
 
+  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [shippingAddress, setShippingAddress] = useState<Address>(() =>
     user?.address ? { ...user.address } : { ...emptyAddress }
@@ -100,6 +101,10 @@ export default function CheckoutPage() {
 
   const delivery = deliveryOptions.find((d) => d.id === deliveryId) ?? deliveryOptions[0];
   const totalWithDelivery = total + delivery.price;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isAdmin) router.replace("/admin");
@@ -214,7 +219,7 @@ export default function CheckoutPage() {
 
       <StepIndicator step={step} />
 
-      {!cartHydrated ? (
+      {!mounted || !cartHydrated ? (
         <div className="rounded-2xl border border-border bg-card p-10 text-center">
           <p className="text-sm text-muted-foreground">Loading checkout...</p>
         </div>

@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { createSelector, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { CartItem, Coupon, Product } from "../types";
 import { siteConfig } from "../site";
 import type { RootState } from "./store";
@@ -209,32 +209,34 @@ export const selectCartCoupon = (state: RootState) => state.cart.coupon;
 export const selectCartCount = (state: RootState) =>
   state.cart.items.reduce((n, i) => n + i.quantity, 0);
 
-export const selectCartTotals = (state: RootState) => {
-  const { items, coupon } = state.cart;
-  const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-  let discount = 0;
-  if (coupon) {
-    if (coupon.type === "percentage") {
-      discount = (subtotal * coupon.value) / 100;
-      if (coupon.maxDiscount) discount = Math.min(discount, coupon.maxDiscount);
-    } else {
-      discount = coupon.value;
+export const selectCartTotals = createSelector(
+  [(state: RootState) => state.cart.items, (state: RootState) => state.cart.coupon],
+  (items, coupon) => {
+    const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+    let discount = 0;
+    if (coupon) {
+      if (coupon.type === "percentage") {
+        discount = (subtotal * coupon.value) / 100;
+        if (coupon.maxDiscount) discount = Math.min(discount, coupon.maxDiscount);
+      } else {
+        discount = coupon.value;
+      }
+      discount = Math.min(discount, subtotal);
     }
-    discount = Math.min(discount, subtotal);
+    const shipping =
+      subtotal - discount >= siteConfig.freeShippingThreshold || subtotal === 0
+        ? 0
+        : siteConfig.shippingRate;
+    const tax = (subtotal - discount) * siteConfig.taxRate;
+    return {
+      subtotal,
+      discount,
+      shipping,
+      tax,
+      total: subtotal - discount + shipping + tax,
+    };
   }
-  const shipping =
-    subtotal - discount >= siteConfig.freeShippingThreshold || subtotal === 0
-      ? 0
-      : siteConfig.shippingRate;
-  const tax = (subtotal - discount) * siteConfig.taxRate;
-  return {
-    subtotal,
-    discount,
-    shipping,
-    tax,
-    total: subtotal - discount + shipping + tax,
-  };
-};
+);
 
 export const selectIsInCart = (productId: string) => (state: RootState) =>
   state.cart.items.some((i) => i.product.id === productId);

@@ -47,12 +47,17 @@ export default function CartPage() {
   const { subtotal, discount, shipping, tax, total } = useSelector(selectCartTotals);
   const coupon = useSelector(selectCartCoupon);
   const [validateCoupon] = useValidateCouponMutation();
+  const [mounted, setMounted] = useState(false);
   const [code, setCode] = useState("");
 
   useSyncCartStock({ notify: true });
 
   const freeShippingLeft = Math.max(0, siteConfig.freeShippingThreshold - (subtotal - discount));
   const progress = Math.min(100, ((subtotal - discount) / siteConfig.freeShippingThreshold) * 100);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isAdmin) router.replace("/admin");
@@ -86,7 +91,7 @@ export default function CartPage() {
         Shopping Cart
       </h1>
 
-      { !cartHydrated ? (
+      {!mounted || !cartHydrated ? (
         <p className="py-8 text-sm text-muted-foreground">Loading your cart...</p>
       ) : items.length === 0 ? (
         <EmptyState

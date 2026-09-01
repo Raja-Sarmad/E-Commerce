@@ -8,6 +8,7 @@ import {
   type CurrencyCode,
 } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/hooks/use-mounted";
 import {
   selectCurrencyCode,
   setCurrency,
@@ -22,6 +23,7 @@ export function CurrencySelector({
   className,
   compact = false,
 }: CurrencySelectorProps) {
+  const mounted = useMounted();
   const dispatch = useDispatch();
   const active = useSelector(selectCurrencyCode);
   const [open, setOpen] = useState(false);
@@ -37,7 +39,8 @@ export function CurrencySelector({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
 
-  const activeMeta = CURRENCY_LIST.find((c) => c.code === active);
+  const displayCode = mounted ? active : "USD";
+  const displayMeta = CURRENCY_LIST.find((c) => c.code === displayCode);
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
@@ -52,10 +55,10 @@ export function CurrencySelector({
         )}
       >
         <FiGlobe className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-        <span>{active}</span>
+        <span>{displayCode}</span>
         {!compact && (
           <span className="hidden text-xs font-normal text-muted-foreground sm:inline">
-            {activeMeta?.symbol}
+            {displayMeta?.symbol}
           </span>
         )}
         <FiChevronDown

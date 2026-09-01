@@ -19,8 +19,6 @@ import { CurrencyReactivity } from "@/components/layout/CurrencyReactivity";
 function HydrateClientState() {
   const dispatch = useDispatch<AppDispatch>();
   useEffect(() => {
-    dispatch(hydrateAccessToken());
-    dispatch(hydrateCart());
     dispatch(hydrateWishlist());
     dispatch(hydrateCompare());
     dispatch(hydrateCurrency());
@@ -28,11 +26,20 @@ function HydrateClientState() {
   return null;
 }
 
+function createStore() {
+  const store = makeStore();
+  bindCurrencyStore(store);
+  if (typeof window !== "undefined") {
+    store.dispatch(hydrateAccessToken());
+    store.dispatch(hydrateCart());
+  }
+  return store;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   const storeRef = useRef<AppStore | null>(null);
   if (!storeRef.current) {
-    storeRef.current = makeStore();
-    bindCurrencyStore(storeRef.current);
+    storeRef.current = createStore();
   }
 
   return (

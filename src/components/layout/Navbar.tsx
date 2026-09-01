@@ -31,9 +31,11 @@ import { selectWishlistItems } from "@/lib/rtk/wishlistSlice";
 import { navLinks, siteConfig } from "@/lib/site";
 import { useGetStorefrontCategoriesQuery } from "@/lib/rtk/storefrontApi";
 import { CurrencySelector } from "@/components/layout/CurrencySelector";
+import { useMounted } from "@/hooks/use-mounted";
 import { cn, formatPrice } from "@/lib/utils";
 
 export function Navbar() {
+  const mounted = useMounted();
   const cartCount = useSelector(selectCartCount);
   const wishlistItems = useSelector(selectWishlistItems);
   const { theme, toggleTheme } = useTheme();
@@ -137,11 +139,11 @@ export function Navbar() {
 
                 <Link
                   href="/wishlist"
-                  aria-label={`Wishlist, ${wishlistItems.length} items`}
+                  aria-label={`Wishlist, ${mounted ? wishlistItems.length : 0} items`}
                   className="relative hidden rounded-lg p-2.5 text-foreground transition-colors hover:bg-muted sm:block"
                 >
                   <FiHeart className="h-5 w-5" aria-hidden />
-                  {wishlistItems.length > 0 && (
+                  {mounted && wishlistItems.length > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                       {wishlistItems.length}
                     </span>
@@ -149,11 +151,11 @@ export function Navbar() {
                 </Link>
 
                 <Link
-                  href={user ? "/account/profile" : "/login"}
+                  href={mounted && user ? "/account/profile" : "/login"}
                   aria-label="Account"
                   className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-foreground transition-colors hover:bg-muted md:flex"
                 >
-                  {user ? (
+                  {mounted && user ? (
                     <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
                       {user.name.charAt(0)}
                     </span>
@@ -175,11 +177,11 @@ export function Navbar() {
                   <button
                     type="button"
                     onClick={() => setCartOpen(true)}
-                    aria-label={`Cart, ${cartCount} items`}
+                    aria-label={`Cart, ${mounted ? cartCount : 0} items`}
                     className="relative rounded-lg p-2.5 text-foreground transition-colors hover:bg-muted"
                   >
                     <FiShoppingBag className="h-5 w-5" aria-hidden />
-                    {cartCount > 0 && (
+                    {mounted && cartCount > 0 && (
                       <span className="animate-pulse-ring absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                         {cartCount}
                       </span>
@@ -319,6 +321,18 @@ function DesktopNav({ categories }: { categories: any[] }) {
 }
 
 function PromoPill() {
+  const mounted = useMounted();
+  if (!mounted) {
+    return (
+      <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span className="relative flex h-2 w-2">
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+        </span>
+        Free shipping available
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
       <span className="relative flex h-2 w-2">

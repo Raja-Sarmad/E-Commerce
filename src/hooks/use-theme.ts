@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
+function readStoredTheme(): Theme {
   const stored = window.localStorage.getItem("novamart-theme");
   if (stored === "light" || stored === "dark") return stored;
   return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -14,7 +13,13 @@ function getInitialTheme(): Theme {
 }
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [theme, setThemeState] = useState<Theme>("light");
+
+  useEffect(() => {
+    const stored = readStoredTheme();
+    setThemeState(stored);
+    document.documentElement.classList.toggle("dark", stored === "dark");
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;

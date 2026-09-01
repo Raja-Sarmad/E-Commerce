@@ -163,47 +163,52 @@ export default function CheckoutClient() {
   };
 
   const handlePlaceOrder = async () => {
-    if (!cardValid) return;
+    if (!cardValid) {
+      toast.error(
+        "Payment details incomplete",
+        "Fill in all card fields or choose PayPal / Apple Pay."
+      );
+      return;
+    }
     setProcessing(true);
 
-    const fresh = await refetchStock();
-    const stockMap = fresh.data;
-    if (stockMap) {
-      dispatch(syncCartStock(stockMap));
-    }
-
-    const stockCheck = validateCartStockBeforeCheckout(items, stockMap);
-    if (!stockCheck.ok) {
-      toast.error("Stock unavailable", stockCheck.message);
-      setProcessing(false);
-      router.push("/cart");
-      return;
-    }
-
-    const payload = {
-      items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
-      couponCode: coupon?.code ?? undefined,
-      shippingAddress: sameAsBilling ? shippingAddress : { ...shippingAddress },
-      billingAddress: sameAsBilling ? shippingAddress : billingAddress,
-      paymentMethod: paymentMethod === "card" ? "card" : paymentMethod,
-    };
-
-    if (isAuthenticated) {
-      try {
-        const created = await createOrder(payload).unwrap();
-        dispatch(clearCart());
-        toast.success("Order placed!", `Order ${created.number} confirmed.`);
-        router.push(`/order-success?number=${created.number}`);
-      } catch (err) {
-        toast.error("Order failed", getErrorMessage(err));
-        setProcessing(false);
+    try {
+      const fresh = await refetchStock();
+      const stockMap = fresh.data;
+      if (stockMap) {
+        dispatch(syncCartStock(stockMap));
       }
-      return;
-    }
 
-    toast.error("Login required", "Please log in to complete your purchase.");
-    setProcessing(false);
-    router.push("/login?redirect=/checkout");
+      const stockCheck = validateCartStockBeforeCheckout(items, stockMap);
+      if (!stockCheck.ok) {
+        toast.error("Stock unavailable", stockCheck.message);
+        router.push("/cart");
+        return;
+      }
+
+      const payload = {
+        items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+        couponCode: coupon?.code ?? undefined,
+        shippingAddress: sameAsBilling ? shippingAddress : { ...shippingAddress },
+        billingAddress: sameAsBilling ? shippingAddress : billingAddress,
+        paymentMethod: paymentMethod === "card" ? "card" : paymentMethod,
+      };
+
+      if (!isAuthenticated) {
+        toast.error("Login required", "Please log in to complete your purchase.");
+        router.push("/login?redirect=/checkout");
+        return;
+      }
+
+      const created = await createOrder(payload).unwrap();
+      dispatch(clearCart());
+      toast.success("Order placed!", `Order ${created.number} confirmed.`);
+      router.push(`/order-success?number=${created.number}`);
+    } catch (err) {
+      toast.error("Order failed", getErrorMessage(err));
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const updateAddress = (

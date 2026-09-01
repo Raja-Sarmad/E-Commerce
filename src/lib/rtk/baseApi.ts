@@ -33,6 +33,16 @@ const unwrapResponse = (result: { data?: ApiEnvelope | unknown }, meta?: unknown
   return { data: (result.data ?? null) as never, meta: meta as never };
 };
 
+function storeAccessTokenFromResult(
+  api: { dispatch: (action: unknown) => void },
+  result: { data?: unknown }
+) {
+  const envelope = result.data as ApiEnvelope | undefined;
+  if (envelope?.accessToken) {
+    api.dispatch(setAccessToken(envelope.accessToken));
+  }
+}
+
 export const baseQueryWithReauth: BaseQueryFn<
   string | FetchArgs,
   unknown,
@@ -51,6 +61,7 @@ export const baseQueryWithReauth: BaseQueryFn<
     );
 
     if (refreshResult.data) {
+      storeAccessTokenFromResult(api, refreshResult);
       result = await rawBaseQuery(args, api, extraOptions);
       error = result.error as FetchBaseQueryError | undefined;
     } else {
@@ -62,10 +73,7 @@ export const baseQueryWithReauth: BaseQueryFn<
     return { error };
   }
 
-  const envelope = (result as { data?: ApiEnvelope }).data;
-  if (envelope?.accessToken) {
-    api.dispatch(setAccessToken(envelope.accessToken));
-  }
+  storeAccessTokenFromResult(api, result as { data?: unknown });
 
   return unwrapResponse(result as { data?: ApiEnvelope | unknown }, undefined);
 };

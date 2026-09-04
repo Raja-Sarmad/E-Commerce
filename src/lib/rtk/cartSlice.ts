@@ -135,11 +135,14 @@ const cartSlice = createSlice({
       if (state.ownerId === nextOwnerId) return;
 
       const stored = readStoredCart(nextOwnerId);
+      const itemsToKeep = stored.items.length > 0 ? stored.items : state.items;
+      const couponToKeep = stored.coupon ?? state.coupon;
       state.ownerId = nextOwnerId;
-      state.items = stored.items;
-      state.coupon = stored.coupon;
+      state.items = itemsToKeep;
+      state.coupon = couponToKeep;
       state.hydrated = true;
       persistCartOwnerId(nextOwnerId);
+      persistCart(state);
     },
     addItem: (
       state,
@@ -150,7 +153,12 @@ const cartSlice = createSlice({
         size?: string;
       }>
     ) => {
-      if (!state.ownerId) return;
+      if (!state.ownerId) {
+        const storedOwnerId = readStoredCartOwnerId();
+        if (storedOwnerId) {
+          state.ownerId = storedOwnerId;
+        }
+      }
 
       const { product, quantity = 1, color, size } = action.payload;
       const stock = Math.max(0, product.stock ?? 0);

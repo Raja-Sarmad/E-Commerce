@@ -100,7 +100,8 @@ export default function CheckoutClient() {
   const { refetch: refetchStock } = useSyncCartStock();
 
   const delivery = deliveryOptions.find((d) => d.id === deliveryId) ?? deliveryOptions[0];
-  const totalWithDelivery = total + delivery.price;
+  const effectiveShipping = cartShipping + delivery.price;
+  const calculatedTotal = subtotal - discount + effectiveShipping;
 
   useEffect(() => {
     if (isAdmin) router.replace("/admin");
@@ -192,6 +193,7 @@ export default function CheckoutClient() {
         shippingAddress: sameAsBilling ? shippingAddress : { ...shippingAddress },
         billingAddress: sameAsBilling ? shippingAddress : billingAddress,
         paymentMethod: paymentMethod === "card" ? "card" : paymentMethod,
+        deliveryOption: deliveryId,
       };
 
       if (!isAuthenticated) {
@@ -438,7 +440,7 @@ export default function CheckoutClient() {
                 </Button>
               ) : (
                 <Button onClick={handlePlaceOrder} loading={processing} leftIcon={!processing ? <FiLock className="h-4 w-4" aria-hidden /> : undefined}>
-                  {processing ? "Placing order..." : `Place order · ${formatPrice(totalWithDelivery)}`}
+                  {processing ? "Placing order..." : `Place order · ${formatPrice(calculatedTotal)}`}
                 </Button>
               )}
             </div>
@@ -467,11 +469,11 @@ export default function CheckoutClient() {
               <div className="mt-4 space-y-2.5 text-sm">
                 <Row label="Subtotal" value={formatPrice(subtotal)} />
                 {discount > 0 && <Row label="Discount" value={`-${formatPrice(discount)}`} accent />}
-                <Row label="Shipping" value={delivery.price === 0 ? "Free" : formatPrice(delivery.price)} />
+                <Row label="Shipping" value={effectiveShipping === 0 ? "Free" : formatPrice(effectiveShipping)} />
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
                 <span className="text-base font-bold text-foreground">Total</span>
-                <span className="text-2xl font-extrabold text-foreground">{formatPrice(totalWithDelivery)}</span>
+                <span className="text-2xl font-extrabold text-foreground">{formatPrice(calculatedTotal)}</span>
               </div>
               <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                 <FiLock className="h-3.5 w-3.5" aria-hidden />

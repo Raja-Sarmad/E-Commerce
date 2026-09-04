@@ -94,6 +94,19 @@ export const authApi = baseApi.injectEndpoints({
       query: () => ({ url: "/users/me" }),
       transformResponse: (raw: unknown) => normalizeUser(raw as Record<string, unknown>) as User | null,
       providesTags: ["Auth", "User"],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data: user } = await queryFulfilled;
+          if (user) {
+            dispatch(setUser(user));
+            dispatch(switchCartOwner(user.id));
+          } else {
+            dispatch(setUser(null));
+          }
+        } catch {
+          dispatch(setUser(null));
+        }
+      },
     }),
     updateProfile: builder.mutation<User, Partial<Record<string, unknown>>>({
       query: (body) => ({ url: "/users/me", method: "PATCH", body }),

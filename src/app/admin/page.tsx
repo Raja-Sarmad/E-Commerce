@@ -21,7 +21,7 @@ import { StatusBadge } from "@/components/admin/StatusBadge";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import {
-  BarChart,
+  CandlestickChart,
   ChartCard,
   DonutChart,
   LineChart,
@@ -234,7 +234,7 @@ export default function AdminDashboardPage() {
             ) : undefined
           }
         >
-          <BarChart
+          <CandlestickChart
             data={revenueSeries}
             height={220}
             formatValue={(v) => formatPrice(v)}

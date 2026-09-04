@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
 import {
   FiGrid,
   FiLink,
@@ -28,6 +29,7 @@ import { uploadFileToCloudinary } from "@/lib/cloudinary-upload";
 import { slugify, sanitizePositiveDecimal, sanitizeWholeNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useFormatPrice } from "@/hooks/use-format-price";
+import { selectCurrencyMeta } from "@/lib/rtk/currencySlice";
 import type { Product } from "@/lib/types";
 
 const maxImageSizeMb = 5;
@@ -156,12 +158,41 @@ const emptyForm = {
 
 export function ProductForm({ initial, mode }: ProductFormProps) {
   const formatPrice = useFormatPrice();
+  const currencyMeta = useSelector(selectCurrencyMeta);
   const router = useRouter();
   const { data: categoryData, isLoading: categoriesLoading } = useGetAdminCategoriesQuery({});
   const categories = categoryData?.items ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [createProduct] = useCreateProductMutation();
   const [updateProduct] = useUpdateProductMutation();
+
+  // Convert USD (database) → active currency for display in input
+  const usdToActive = (usd: number) => {
+    if (!usd || !Number.isFinite(usd)) return "";
+    const converted = usd * currencyMeta.rateFromUsd;
+    const digits = currencyMeta.fractionDigits ?? 2;
+    return converted.toFixed(digits);
+  };
+
+  // Convert active currency input value → USD for database storage
+  const activeToUsd = (val: string) => {
+    const num = Number(val);
+    if (!Number.isFinite(num) || num <= 0) return 0;
+    return num / currencyMeta.rateFromUsd;
+  };
+
+  // Format the currently-entered price for preview (no double-conversion)
+  const previewPrice = (val: string) => {
+    const num = Number(val);
+    if (!num || !Number.isFinite(num)) return `${currencyMeta.symbol}0`;
+    const digits = currencyMeta.fractionDigits ?? 2;
+    return new Intl.NumberFormat(currencyMeta.locale, {
+      style: "currency",
+      currency: currencyMeta.code,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(num);
+  };
 
   const [form, setForm] = useState(() =>
     initial
@@ -173,9 +204,10 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
           categorySlug: initial.categorySlug,
           description: initial.description,
           features: [...initial.features],
-          price: String(initial.price),
+          // stored as USD in DB, show in active currency
+          price: usdToActive(initial.price),
           compareAtPrice: initial.compareAtPrice
-            ? String(initial.compareAtPrice)
+            ? usdToActive(initial.compareAtPrice)
             : "",
           sku: initial.sku,
           stock: String(initial.stock),
@@ -269,9 +301,12 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     formData.append("category", form.category);
     formData.append("categorySlug", form.categorySlug);
     formData.append("description", form.description.trim());
-    formData.append("price", String(Math.max(0, Number(form.price) || 0)));
-    if (form.compareAtPrice) {
-      formData.append("compareAtPrice", String(Math.max(0, Number(form.compareAtPrice) || 0)));
+    // Convert active currency → USD before saving to database
+    const priceUsd = activeToUsd(form.price);
+    const compareAtPriceUsd = form.compareAtPrice ? activeToUsd(form.compareAtPrice) : 0;
+    formData.append("price", String(Math.max(0, priceUsd)));
+    if (form.compareAtPrice && compareAtPriceUsd > 0) {
+      formData.append("compareAtPrice", String(Math.max(0, compareAtPriceUsd)));
     }
     formData.append("stock", form.stock);
     formData.append("sku", form.sku.trim());
@@ -458,9 +493,22 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
       </SectionCard>
 
       <SectionCard title="Pricing" description="Prices, discounts and sale settings.">
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          <span>💱</span>
+          <span>
+            Entering prices in{" "}
+            <strong className="text-foreground">{currencyMeta.label} ({currencyMeta.code})</strong>.
+            The system will automatically convert to USD for storage.
+            {currencyMeta.code !== "USD" && (
+              <>
+                {" "}Rate: 1 USD = {currencyMeta.rateFromUsd} {currencyMeta.code}
+              </>
+            )}
+          </span>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="Price (USD)"
+            label={`Price (${currencyMeta.code})`}
             type="text"
             inputMode="decimal"
             value={form.price}
@@ -470,10 +518,11 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             }}
             onWheel={(e) => (e.target as HTMLInputElement).blur()}
             error={fieldErrors.price}
-            placeholder="99.00"
+            placeholder={currencyMeta.code === "PKR" ? "27800" : "99.00"}
+            leftIcon={<span className="text-xs font-semibold text-muted-foreground">{currencyMeta.symbol}</span>}
           />
           <Input
-            label="Compare-at price (USD)"
+            label={`Compare-at price (${currencyMeta.code})`}
             type="text"
             inputMode="decimal"
             value={form.compareAtPrice}
@@ -483,19 +532,20 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             }}
             onWheel={(e) => (e.target as HTMLInputElement).blur()}
             hint="Original price used to show a discount"
-            placeholder="129.00"
+            placeholder={currencyMeta.code === "PKR" ? "35000" : "129.00"}
+            leftIcon={<span className="text-xs font-semibold text-muted-foreground">{currencyMeta.symbol}</span>}
           />
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/40 p-3">
           <span className="text-sm text-muted-foreground">Preview:</span>
           <span className="text-lg font-extrabold text-foreground">
-            {form.price ? formatPrice(Number(form.price)) : "$0"}
+            {form.price ? previewPrice(form.price) : `${currencyMeta.symbol}0`}
           </span>
           {form.compareAtPrice &&
             Number(form.compareAtPrice) > Number(form.price) && (
               <>
                 <span className="text-sm text-muted-foreground line-through">
-                  {formatPrice(Number(form.compareAtPrice))}
+                  {previewPrice(form.compareAtPrice)}
                 </span>
                 <Badge variant="destructive">
                   {Math.round(
@@ -507,6 +557,11 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
                 </Badge>
               </>
             )}
+          {currencyMeta.code !== "USD" && form.price && Number(form.price) > 0 && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              ≈ ${activeToUsd(form.price).toFixed(2)} USD stored
+            </span>
+          )}
         </div>
       </SectionCard>
 

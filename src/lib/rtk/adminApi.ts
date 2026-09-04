@@ -223,7 +223,7 @@ export const adminApi = baseApi.injectEndpoints({
 
     /* ── Categories ────────────────────────────────────────────── */
     getAdminCategories: builder.query<ListResponse<AdminCategory>, Record<string, string | number | undefined>>({
-      query: (params) => ({ url: `/categories${buildQs({ ...params, all: "true" })}` }),
+      query: () => ({ url: `/categories/admin/list` }),
       transformResponse: (raw: unknown) => {
         const data = (raw as { data?: unknown })?.data ?? raw;
         const items = (Array.isArray(data) ? data : []) as AdminCategory[];

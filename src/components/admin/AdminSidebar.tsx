@@ -57,14 +57,16 @@ const navGroups: NavGroup[] = [
   {
     label: "Catalog",
     items: [
-      { label: "Catalog overview", href: "/admin/catalog", icon: FiShoppingBag, end: true },
+      { label: "Catalog Overview", href: "/admin/catalog", icon: FiShoppingBag, end: true },
       { label: "Products", href: "/admin/products", icon: FiBox },
       { label: "Categories", href: "/admin/categories", icon: FiGrid },
       { label: "Brands", href: "/admin/brands", icon: FiAward },
+      { label: "Inventory", href: "/admin/inventory", icon: FiPackage },
+      { label: "Reviews", href: "/admin/reviews", icon: FiStar },
     ],
   },
   {
-    label: "Sales",
+    label: "💰 Sales",
     items: [
       { label: "Orders", href: "/admin/orders", icon: FiShoppingBag },
       { label: "Payments", href: "/admin/payments", icon: FiCreditCard },
@@ -73,16 +75,14 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Management",
+    label: "👥 Management",
     items: [
       { label: "Customers", href: "/admin/customers", icon: FiUsers },
       { label: "Vendors", href: "/admin/vendors", icon: FiUserCheck },
-      { label: "Inventory", href: "/admin/inventory", icon: FiPackage },
-      { label: "Reviews", href: "/admin/reviews", icon: FiStar },
     ],
   },
   {
-    label: "Content",
+    label: "📋 Content",
     items: [
       { label: "Blog", href: "/admin/blog", icon: FiEdit2 },
       { label: "Banners", href: "/admin/banners", icon: FiImage },
@@ -91,7 +91,7 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Engagement",
+    label: "💬 Engagement",
     items: [
       { label: "Newsletter", href: "/admin/newsletter", icon: FiMail },
       { label: "Messages", href: "/admin/messages", icon: FiMessageSquare },
@@ -99,14 +99,14 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Insights",
+    label: "📊 Insights",
     items: [
       { label: "Analytics", href: "/admin/analytics", icon: FiBarChart2 },
       { label: "Reports", href: "/admin/reports", icon: FiFileText },
     ],
   },
   {
-    label: "System",
+    label: "⚙️ System",
     items: [
       { label: "Roles & Permissions", href: "/admin/roles", icon: FiShield },
       { label: "Media Library", href: "/admin/media", icon: FiFolder },

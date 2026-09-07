@@ -61,9 +61,16 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const outOfStock = liveStock === 0;
   const showInCart = mounted && inCart;
 
+  const hasVariants = !!product.variants && product.variants.length > 0;
+
   const handleAddToCart = () => {
     if (!user) {
       setShowAuthModal(true);
+      return;
+    }
+    // Products with size variants require size selection → open quick view
+    if (hasVariants) {
+      setQuickView(true);
       return;
     }
     if (outOfStock) {
@@ -81,7 +88,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
 
   const handleDecrease = () => {
     if (cartQuantity <= 1) {
-      dispatch(removeItem(product.id));
+      dispatch(removeItem({ productId: product.id }));
       toast.info("Removed from cart", product.name);
     } else {
       dispatch(updateQuantity({ productId: product.id, quantity: cartQuantity - 1 }));

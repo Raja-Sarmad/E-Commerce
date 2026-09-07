@@ -179,12 +179,18 @@ const cartSlice = createSlice({
     },
     updateQuantity: (
       state,
-      action: PayloadAction<{ productId: string; quantity: number }>
+      action: PayloadAction<{ productId: string; quantity: number; size?: string; color?: string }>
     ) => {
-      const { productId, quantity } = action.payload;
+      const { productId, quantity, size, color } = action.payload;
       state.items = state.items
         .map((i) => {
-          if (i.product.id !== productId) return i;
+          if (
+            i.product.id !== productId ||
+            i.size !== size ||
+            i.color !== color
+          ) {
+            return i;
+          }
           const stock = Math.max(0, i.product.stock ?? 0);
           return {
             ...i,
@@ -194,8 +200,18 @@ const cartSlice = createSlice({
         .filter((i) => i.quantity > 0);
       persistCart(state);
     },
-    removeItem: (state, action: PayloadAction<string>) => {
-      state.items = state.items.filter((i) => i.product.id !== action.payload);
+    removeItem: (
+      state,
+      action: PayloadAction<{ productId: string; size?: string; color?: string }>
+    ) => {
+      state.items = state.items.filter(
+        (i) =>
+          !(
+            i.product.id === action.payload.productId &&
+            i.size === action.payload.size &&
+            i.color === action.payload.color
+          )
+      );
       persistCart(state);
     },
     clearCart: (state) => {
@@ -211,23 +227,57 @@ const cartSlice = createSlice({
       state.coupon = null;
       persistCart(state);
     },
-    syncCartStock: (state, action: PayloadAction<Record<string, number>>) => {
+    syncCartStock: (
+      state,
+      action: PayloadAction<
+        Record<string, { stock: number; variants?: Record<string, number> }>
+      >
+    ) => {
       const stockMap = action.payload;
       let changed = false;
 
       const nextItems = state.items
         .map((item) => {
           const live = stockMap[item.product.id];
-          if (live === undefined) return item;
-          const stock = Math.max(0, live);
+          if (!live) return item;
+
+          // Determine effective stock for this cart line
+          let stock: number;
+          let updatedProduct = item.product;
+          if (item.size && item.product.variants && item.product.variants.length > 0) {
+            const variantStock = live.variants?.[item.size];
+            if (variantStock === undefined) return item;
+            stock = Math.max(0, variantStock);
+            // Update the stored variant stock for this size
+            updatedProduct = {
+              ...item.product,
+              stock,
+              variants: item.product.variants.map((v) =>
+                v.size === item.size
+                  ? { ...v, stock }
+                  : { ...v, stock: live.variants?.[v.size] ?? v.stock }
+              ),
+            };
+          } else {
+            stock = Math.max(0, live.stock ?? item.product.stock ?? 0);
+            updatedProduct = {
+              ...item.product,
+              stock,
+              variants: item.product.variants?.map((v) => ({
+                ...v,
+                stock: live.variants?.[v.size] ?? v.stock,
+              })),
+            };
+          }
+
           const quantity = Math.min(item.quantity, stock);
-          if (item.product.stock === stock && item.quantity === quantity) {
+          if (updatedProduct.stock === item.product.stock && item.quantity === quantity) {
             return item;
           }
           changed = true;
           return {
             ...item,
-            product: { ...item.product, stock },
+            product: updatedProduct,
             quantity,
           };
         })
@@ -294,8 +344,20 @@ export const selectCartTotals = createSelector(
   }
 );
 
-export const selectIsInCart = (productId: string) => (state: RootState) =>
-  state.cart.items.some((i) => i.product.id === productId);
+export const selectIsInCart =
+  (productId: string, size?: string, color?: string) => (state: RootState) =>
+    state.cart.items.some(
+      (i) =>
+        i.product.id === productId &&
+        i.size === size &&
+        i.color === color
+    );
 
-export const selectCartItemQuantity = (productId: string) => (state: RootState) =>
-  state.cart.items.find((i) => i.product.id === productId)?.quantity ?? 0;
+export const selectCartItemQuantity =
+  (productId: string, size?: string, color?: string) => (state: RootState) =>
+    state.cart.items.find(
+      (i) =>
+        i.product.id === productId &&
+        i.size === size &&
+        i.color === color
+    )?.quantity ?? 0;

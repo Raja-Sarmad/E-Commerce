@@ -16,6 +16,7 @@ import { useGetMeQuery } from "@/lib/rtk/authApi";
 import type { Product } from "@/lib/types";
 import { useFormatPrice } from "@/hooks/use-format-price";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 type QuickViewProps = {
   product: Product;
@@ -28,12 +29,20 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
   const dispatch = useDispatch();
   const { isAdmin } = useIsAdmin();
   const { data: user } = useGetMeQuery();
-  const inCart = useSelector(selectIsInCart(product.id));
   const cartItems = useSelector(selectCartItems);
   const [added, setAdded] = useState(false);
   const [qty, setQty] = useState(1);
+  const [size, setSize] = useState(product.sizes?.[0]);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const maxQuantity = Math.max(0, product.stock ?? 0);
+  const inCart = useSelector(selectIsInCart(product.id, size));
+
+  const hasVariants = !!product.variants && product.variants.length > 0;
+  const variantStock =
+    size && hasVariants
+      ? (product.variants?.find((v) => v.size === size)?.stock ?? 0)
+      : product.stock ?? 0;
+  const maxQuantity = Math.max(0, variantStock);
+  const outOfStock = variantStock === 0;
 
   const discount = product.compareAtPrice
     ? Math.round(
@@ -41,30 +50,41 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
       )
     : 0;
 
+  const handleSizeSelect = (s: string) => {
+    setSize(s);
+    setQty(1);
+  };
+
   const handleAdd = () => {
     if (!user) {
       setShowAuthModal(true);
       return;
     }
-    if (product.stock === 0) {
-      toast.warning("No stock available", "This product is currently out of stock.");
+    if (outOfStock) {
+      toast.warning("No stock available", "This size is currently out of stock.");
       return;
     }
+    const cartProduct = {
+      ...product,
+      stock: variantStock,
+    };
     const check = validateCartQuantity(
       cartItems,
-      product,
+      cartProduct,
       qty,
-      inCart ? "set" : "add"
+      inCart ? "set" : "add",
+      undefined,
+      size
     );
     if (!check.ok) {
       toast.warning(check.title, check.message);
       return;
     }
     if (inCart) {
-      dispatch(updateQuantity({ productId: product.id, quantity: qty }));
+      dispatch(updateQuantity({ productId: product.id, quantity: qty, size }));
       toast.success("Cart updated", `${qty} × ${product.name}`);
     } else {
-      dispatch(addItem({ product, quantity: qty }));
+      dispatch(addItem({ product: cartProduct, quantity: qty, size }));
       toast.success("Added to cart", `${qty} × ${product.name}`);
     }
     setAdded(true);
@@ -110,8 +130,19 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
 
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <Rating value={product.rating} showValue count={product.reviewsCount} />
-            <span className="text-xs text-muted-foreground">
-              {product.stock} in stock
+            <span
+              className={cn(
+                "text-xs",
+                outOfStock ? "font-semibold text-destructive" : "text-muted-foreground"
+              )}
+            >
+              {outOfStock
+                ? hasVariants
+                  ? `${size} - out of stock`
+                  : "Out of stock"
+                : hasVariants
+                  ? `${size}: ${variantStock} in stock`
+                  : `${product.stock} in stock`}
             </span>
           </div>
 
@@ -142,6 +173,37 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
             ))}
           </ul>
 
+          {product.sizes && product.sizes.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-foreground">Size</p>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {product.sizes.map((s) => {
+                  const sStock = product.variants?.find((v) => v.size === s)?.stock ?? product.stock ?? 0;
+                  const sOutOfStock = sStock === 0;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleSizeSelect(s)}
+                      disabled={sOutOfStock && s !== size}
+                      title={sOutOfStock ? `${s} - out of stock` : `${s} - ${sStock} in stock`}
+                      className={cn(
+                        "rounded-lg border px-3.5 py-2 text-sm font-medium transition-all",
+                        size === s
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : sOutOfStock
+                            ? "cursor-not-allowed border-border text-muted-foreground/50 line-through opacity-60"
+                            : "border-border text-foreground hover:border-primary/50"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {!isAdmin && (
             <div className="mt-6 flex items-center gap-3">
               <div className="flex items-center rounded-lg border border-border">
@@ -165,7 +227,7 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
                   +
                 </button>
               </div>
-              <Button onClick={handleAdd} className="flex-1" disabled={product.stock === 0}>
+              <Button onClick={handleAdd} className="flex-1" disabled={outOfStock}>
                 {added ? (
                   <>
                     <FiCheck className="h-4 w-4" aria-hidden /> Added to cart
@@ -177,7 +239,7 @@ export function QuickView({ product, open, onClose }: QuickViewProps) {
                 ) : (
                   <>
                     <FiShoppingBag className="h-4 w-4" aria-hidden />
-                    {product.stock === 0 ? "Out of stock" : "Add to cart"}
+                    {outOfStock ? "Out of stock" : "Add to cart"}
                   </>
                 )}
               </Button>

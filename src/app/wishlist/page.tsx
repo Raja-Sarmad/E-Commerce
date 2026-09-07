@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FiHeart } from "react-icons/fi";
 import { useSelector, useDispatch } from "react-redux";
@@ -56,6 +57,7 @@ export default function WishlistPage() {
 
 function WishlistCard({ product, dispatch }: { product: Product; dispatch: ReturnType<typeof useDispatch> }) {
   const formatPrice = useFormatPrice();
+  const router = useRouter();
   const inCart = useSelector(selectIsInCart(product.id));
   const cartItems = useSelector(selectCartItems);
   const { isAdmin } = useIsAdmin();
@@ -116,6 +118,11 @@ function WishlistCard({ product, dispatch }: { product: Product; dispatch: Retur
               onClick={() => {
                 if (!user) {
                   setShowAuthModal(true);
+                  return;
+                }
+                const hasVariants = !!product.variants && product.variants.length > 0;
+                if (hasVariants) {
+                  router.push(`/shop/${product.slug}`);
                   return;
                 }
                 if (inCart) return;

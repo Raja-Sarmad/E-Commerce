@@ -193,7 +193,7 @@ export default function CartPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => dispatch(removeItem(item.product.id))}
+                        onClick={() => dispatch(removeItem({ productId: item.product.id, size: item.size, color: item.color }))}
                         aria-label={`Remove ${item.product.name}`}
                         className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       >
@@ -204,7 +204,7 @@ export default function CartPage() {
                       <div className="flex items-center rounded-lg border border-border">
                         <button
                           type="button"
-                          onClick={() => dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity - 1 }))}
+                          onClick={() => dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity - 1, size: item.size, color: item.color }))}
                           aria-label="Decrease quantity"
                           className="p-2 text-muted-foreground transition-colors hover:text-foreground"
                         >
@@ -232,6 +232,8 @@ export default function CartPage() {
                               updateQuantity({
                                 productId: item.product.id,
                                 quantity: item.quantity + 1,
+                                size: item.size,
+                                color: item.color,
                               })
                             );
                           }}

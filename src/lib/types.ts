@@ -21,6 +21,11 @@ export type Review = {
   helpful: number;
 };
 
+export type ProductVariant = {
+  size: string;
+  stock: number;
+};
+
 export type Product = {
   id: string;
   slug: string;
@@ -48,6 +53,7 @@ export type Product = {
   discountPercent: number;
   colors: string[];
   sizes?: string[];
+  variants?: ProductVariant[];
   position: number;
   createdAt: string;
   reviews: Review[];

@@ -47,7 +47,6 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const dispatch = useDispatch();
   const { isAdmin } = useIsAdmin();
   const { data: user } = useGetMeQuery();
-  const inCart = useSelector(selectIsInCart(product.id));
   const cartItems = useSelector(selectCartItems);
   const wishlisted = useSelector(selectIsInWishlist(product.id));
   const compared = useSelector(selectIsInCompare(product.id));
@@ -58,18 +57,40 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const [size, setSize] = useState(product.sizes?.[0]);
   const [added, setAdded] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const inCart = useSelector(selectIsInCart(product.id, size, color));
 
   const { data: stockMap = {} } = useLiveStockMap([product.id]);
-  const liveStock = stockMap[product.id] ?? product.stock ?? 0;
-  const liveProduct = { ...product, stock: liveStock };
+  const liveEntry = stockMap[product.id];
+  const liveStock = liveEntry?.stock ?? product.stock ?? 0;
+  const liveProduct = {
+    ...product,
+    stock: liveStock,
+    variants: product.variants?.map((v) => ({
+      ...v,
+      stock: liveEntry?.variants?.[v.size] ?? v.stock,
+    })),
+  };
 
-  const outOfStock = liveStock === 0;
-  const maxQuantity = Math.max(0, liveStock);
+  // Determine stock for the currently selected size (if variants are in use)
+  const hasVariants = !!product.variants && product.variants.length > 0;
+  const liveVariantStock =
+    size && hasVariants
+      ? (liveProduct.variants?.find((v) => v.size === size)?.stock ?? 0)
+      : liveStock;
+
+  const outOfStock = hasVariants ? liveVariantStock === 0 : liveStock === 0;
+  const maxQuantity = Math.max(0, liveVariantStock);
+
   const discount = product.compareAtPrice
     ? Math.round(
         ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100
       )
     : 0;
+
+  const handleSizeSelect = (s: string) => {
+    setSize(s);
+    setQty(1);
+  };
 
   const handleAddToCart = (buyNow = false) => {
     if (!user) {
@@ -77,12 +98,18 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
     if (outOfStock) {
-      toast.warning("No stock available", "This product is currently out of stock.");
+      toast.warning("No stock available", `This size is currently out of stock.`);
       return;
     }
+    // Build product with variant stock as the effective stock for validation
+    const cartProduct = {
+      ...liveProduct,
+      stock: liveVariantStock,
+      variants: liveProduct.variants,
+    };
     const check = validateCartQuantity(
       cartItems,
-      liveProduct,
+      cartProduct,
       qty,
       inCart ? "set" : "add",
       color,
@@ -93,10 +120,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
     if (inCart) {
-      dispatch(updateQuantity({ productId: product.id, quantity: qty }));
+      dispatch(updateQuantity({ productId: product.id, quantity: qty, size, color }));
       toast.success("Cart updated", `${qty} × ${product.name}`);
     } else {
-      dispatch(addItem({ product: liveProduct, quantity: qty, color, size }));
+      dispatch(addItem({ product: cartProduct, quantity: qty, color, size }));
       setAdded(true);
       toast.success("Added to cart", `${qty} × ${product.name}`);
       setTimeout(() => setAdded(false), 1500);
@@ -178,7 +205,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           "flex items-center gap-2 text-sm font-semibold",
           outOfStock
             ? "text-destructive"
-            : liveStock <= 10
+            : liveVariantStock <= 10
               ? "text-warning"
               : "text-success"
         )}
@@ -188,12 +215,16 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             "inline-block h-2.5 w-2.5 rounded-full",
             outOfStock
               ? "bg-destructive"
-              : liveStock <= 10
+              : liveVariantStock <= 10
                 ? "bg-warning"
                 : "bg-success"
           )}
         />
-        {getStockLabel(liveProduct)}
+        {outOfStock
+          ? "Out of stock"
+          : hasVariants
+            ? `Only ${liveVariantStock} in stock (${size})`
+            : getStockLabel(liveProduct)}
       </p>
 
       <p className="text-sm leading-relaxed text-muted-foreground">
@@ -234,22 +265,45 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         <div>
           <p className="text-sm font-semibold text-foreground">Size</p>
           <div className="mt-2.5 flex flex-wrap gap-2">
-            {product.sizes.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSize(s)}
-                className={cn(
-                  "rounded-lg border px-3.5 py-2 text-sm font-medium transition-all",
-                  size === s
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-foreground hover:border-primary/50"
-                )}
-              >
-                {s}
-              </button>
-            ))}
+            {product.sizes.map((s) => {
+              const variantStock = hasVariants
+                ? (liveProduct.variants?.find((v) => v.size === s)?.stock ?? 0)
+                : liveStock;
+              const sizeOutOfStock = variantStock === 0;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleSizeSelect(s)}
+                  disabled={sizeOutOfStock && s !== size}
+                  aria-label={`Select size ${s}${sizeOutOfStock ? " (out of stock)" : ` (${variantStock} in stock)`}`}
+                  title={sizeOutOfStock ? `${s} - out of stock` : `${s} - ${variantStock} in stock`}
+                  className={cn(
+                    "rounded-lg border px-3.5 py-2 text-sm font-medium transition-all",
+                    size === s
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : sizeOutOfStock
+                        ? "cursor-not-allowed border-border text-muted-foreground/50 line-through opacity-60"
+                        : "border-border text-foreground hover:border-primary/50"
+                  )}
+                >
+                  {s}
+                </button>
+              );
+            })}
           </div>
+          {hasVariants && size && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Size {size}:{" "}
+              {liveVariantStock === 0 ? (
+                <span className="font-semibold text-destructive">Out of stock</span>
+              ) : (
+                <span className="font-semibold text-success">
+                  {liveVariantStock} in stock
+                </span>
+              )}
+            </p>
+          )}
         </div>
       )}
 

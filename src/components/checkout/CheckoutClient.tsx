@@ -188,7 +188,12 @@ export default function CheckoutClient() {
       }
 
       const payload = {
-        items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+        items: items.map((i) => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+          size: i.size,
+          color: i.color,
+        })),
         couponCode: coupon?.code ?? undefined,
         shippingAddress: sameAsBilling ? shippingAddress : { ...shippingAddress },
         billingAddress: sameAsBilling ? shippingAddress : billingAddress,

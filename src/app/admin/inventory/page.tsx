@@ -56,6 +56,7 @@ function StatCard({
 type AdjustmentState = {
   qty: string;
   reason: string;
+  size: string;
   qtyError?: string;
   reasonError?: string;
 };
@@ -67,7 +68,7 @@ export default function AdminInventoryPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PER_PAGE);
   const [adjustTarget, setAdjustTarget] = useState<InventoryEntry | null>(null);
-  const [form, setForm] = useState<AdjustmentState>({ qty: "", reason: "" });
+  const [form, setForm] = useState<AdjustmentState>({ qty: "", reason: "", size: "" });
 
   const dates = useMemo(() => dateRangeFromPreset(dateRange), [dateRange]);
 
@@ -122,9 +123,10 @@ export default function AdminInventoryPage() {
         productId,
         adjustment: quantity,
         reason: form.reason.trim(),
+        size: form.size || undefined,
       }).unwrap();
       setAdjustTarget(null);
-      setForm({ qty: "", reason: "" });
+      setForm({ qty: "", reason: "", size: "" });
       toast.success(
         "Stock adjusted",
         `${adjustTarget.product?.name ?? "Product"} stock updated by ${quantity > 0 ? "+" : ""}${quantity}.`
@@ -136,8 +138,18 @@ export default function AdminInventoryPage() {
 
   const openAdjust = (entry: InventoryEntry) => {
     setAdjustTarget(entry);
-    setForm({ qty: "", reason: "" });
+    setForm({ qty: "", reason: "", size: "" });
   };
+
+  const adjustProductVariants = useMemo(() => {
+    if (!adjustTarget) return [];
+    const product = allProducts.find(
+      (p) =>
+        (p as Record<string, unknown>)._id === (adjustTarget as Record<string, unknown>)._id ||
+        p.sku === adjustTarget.product?.sku
+    );
+    return product?.variants ?? [];
+  }, [adjustTarget, allProducts]);
 
   const columns: Column<InventoryEntry>[] = [
     {
@@ -348,7 +360,7 @@ export default function AdminInventoryPage() {
         open={adjustTarget !== null}
         onClose={() => {
           setAdjustTarget(null);
-          setForm({ qty: "", reason: "" });
+          setForm({ qty: "", reason: "", size: "" });
         }}
         title="Adjust stock"
         subtitle={adjustTarget?.product?.name}
@@ -370,6 +382,23 @@ export default function AdminInventoryPage() {
                 </p>
               </div>
             </div>
+            {adjustProductVariants.length > 0 && (
+              <Select
+                label="Size"
+                value={form.size}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, size: e.target.value }))
+                }
+                hint="Select a size to adjust its stock, or leave empty for overall stock."
+              >
+                <option value="">All sizes (overall)</option>
+                {adjustProductVariants.map((v) => (
+                  <option key={v.size} value={v.size}>
+                    {v.size} · {v.stock} in stock
+                  </option>
+                ))}
+              </Select>
+            )}
             <Input
               label="Quantity"
               type="number"
@@ -395,7 +424,7 @@ export default function AdminInventoryPage() {
                 variant="outline"
                 onClick={() => {
                   setAdjustTarget(null);
-                  setForm({ qty: "", reason: "" });
+                  setForm({ qty: "", reason: "", size: "" });
                 }}
               >
                 Cancel

@@ -4,27 +4,62 @@ import { useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { syncCartStock, selectCartItems } from "@/lib/rtk/cartSlice";
 import type { CartItem } from "@/lib/types";
-import { useLiveStockMap } from "@/components/product/LiveStockProvider";
+import {
+  useLiveStockMap,
+  type LiveStockEntry,
+} from "@/components/product/LiveStockProvider";
 import { toast } from "@/hooks/use-toast";
 
-function stockMapKey(stockMap: Record<string, number>, ids: string[]) {
-  return ids.map((id) => `${id}:${stockMap[id] ?? ""}`).join("|");
+function stockMapKey(
+  stockMap: Record<string, LiveStockEntry>,
+  ids: string[]
+) {
+  return ids
+    .map((id) => {
+      const entry = stockMap[id];
+      if (!entry) return `${id}:`;
+      const variantsKey = entry.variants
+        ? Object.entries(entry.variants)
+            .map(([size, stock]) => `${size}:${stock}`)
+            .sort()
+            .join(",")
+        : "";
+      return `${id}:${entry.stock}:${variantsKey}`;
+    })
+    .join("|");
 }
 
 function collectAdjustments(
   items: CartItem[],
-  stockMap: Record<string, number>
+  stockMap: Record<string, LiveStockEntry>
 ): string[] {
   const adjustments: string[] = [];
   for (const item of items) {
     const live = stockMap[item.product.id];
-    if (live === undefined) continue;
-    if (live === 0) {
-      adjustments.push(`"${item.product.name}" is now out of stock.`);
-    } else if (item.quantity > live) {
-      adjustments.push(
-        `"${item.product.name}" quantity reduced to ${live} (only ${live} left).`
-      );
+    if (!live) continue;
+
+    if (item.size && item.product.variants && item.product.variants.length > 0) {
+      // Variant-level check
+      const variantStock = live.variants?.[item.size];
+      if (variantStock === undefined) continue;
+      if (variantStock === 0) {
+        adjustments.push(
+          `"${item.product.name}" (size: ${item.size}) is now out of stock.`
+        );
+      } else if (item.quantity > variantStock) {
+        adjustments.push(
+          `"${item.product.name}" (size: ${item.size}) quantity reduced to ${variantStock} (only ${variantStock} left).`
+        );
+      }
+    } else {
+      const stock = live.stock ?? 0;
+      if (stock === 0) {
+        adjustments.push(`"${item.product.name}" is now out of stock.`);
+      } else if (item.quantity > stock) {
+        adjustments.push(
+          `"${item.product.name}" quantity reduced to ${stock} (only ${stock} left).`
+        );
+      }
     }
   }
   return adjustments;
@@ -65,7 +100,7 @@ export function useSyncCartStock(options?: { notify?: boolean }) {
 
 export function validateCartStockBeforeCheckout(
   items: CartItem[],
-  stockMap: Record<string, number> | undefined
+  stockMap: Record<string, LiveStockEntry> | undefined
 ): { ok: true } | { ok: false; message: string } {
   if (!items.length) {
     return { ok: false, message: "Your cart is empty." };
@@ -73,18 +108,37 @@ export function validateCartStockBeforeCheckout(
 
   for (const item of items) {
     const live = stockMap?.[item.product.id];
-    if (live === undefined) continue;
-    if (live === 0) {
-      return {
-        ok: false,
-        message: `"${item.product.name}" is out of stock. Please remove it from your cart.`,
-      };
-    }
-    if (item.quantity > live) {
-      return {
-        ok: false,
-        message: `"${item.product.name}" only has ${live} left. Please update your cart.`,
-      };
+    if (!live) continue;
+
+    if (item.size && item.product.variants && item.product.variants.length > 0) {
+      const variantStock = live.variants?.[item.size];
+      if (variantStock === undefined) continue;
+      if (variantStock === 0) {
+        return {
+          ok: false,
+          message: `"${item.product.name}" (size: ${item.size}) is out of stock. Please remove it from your cart.`,
+        };
+      }
+      if (item.quantity > variantStock) {
+        return {
+          ok: false,
+          message: `"${item.product.name}" (size: ${item.size}) only has ${variantStock} left. Please update your cart.`,
+        };
+      }
+    } else {
+      const stock = live.stock ?? 0;
+      if (stock === 0) {
+        return {
+          ok: false,
+          message: `"${item.product.name}" is out of stock. Please remove it from your cart.`,
+        };
+      }
+      if (item.quantity > stock) {
+        return {
+          ok: false,
+          message: `"${item.product.name}" only has ${stock} left. Please update your cart.`,
+        };
+      }
     }
   }
 

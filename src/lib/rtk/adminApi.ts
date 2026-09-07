@@ -579,7 +579,7 @@ export const adminApi = baseApi.injectEndpoints({
       transformResponse: (raw: unknown) => parseListResponse<InventoryEntry>(raw),
       providesTags: ["Products"],
     }),
-    adjustInventory: builder.mutation<unknown, { productId: string; adjustment: number; reason?: string }>({
+    adjustInventory: builder.mutation<unknown, { productId: string; adjustment: number; reason?: string; size?: string }>({
       query: ({ productId, ...body }) => ({ url: `/inventory/adjust/${productId}`, method: "POST", body }),
       invalidatesTags: ["Products", "Dashboard"],
     }),

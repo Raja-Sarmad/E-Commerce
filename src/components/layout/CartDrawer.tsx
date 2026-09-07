@@ -98,7 +98,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => dispatch(removeItem(item.product.id))}
+                    onClick={() => dispatch(removeItem({ productId: item.product.id, size: item.size, color: item.color }))}
                     aria-label={`Remove ${item.product.name} from cart`}
                     className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
@@ -125,7 +125,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                     <button
                       type="button"
                       onClick={() =>
-                        dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity - 1 }))
+                        dispatch(updateQuantity({ productId: item.product.id, quantity: item.quantity - 1, size: item.size, color: item.color }))
                       }
                       aria-label="Decrease quantity"
                       className="p-1.5 text-muted-foreground transition-colors hover:text-foreground"
@@ -154,6 +154,8 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                           updateQuantity({
                             productId: item.product.id,
                             quantity: item.quantity + 1,
+                            size: item.size,
+                            color: item.color,
                           })
                         );
                       }}

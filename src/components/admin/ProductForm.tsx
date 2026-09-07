@@ -30,7 +30,7 @@ import { slugify, sanitizePositiveDecimal, sanitizeWholeNumber } from "@/lib/uti
 import { cn } from "@/lib/utils";
 import { useFormatPrice } from "@/hooks/use-format-price";
 import { selectCurrencyMeta } from "@/lib/rtk/currencySlice";
-import type { Product } from "@/lib/types";
+import type { Product, ProductVariant } from "@/lib/types";
 
 const maxImageSizeMb = 5;
 
@@ -224,6 +224,29 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
       : { ...emptyForm }
   );
 
+  const [variants, setVariants] = useState<ProductVariant[]>(() => {
+    if (initial?.variants && initial.variants.length > 0) {
+      return initial.variants.map((v) => ({ size: v.size, stock: v.stock }));
+    }
+    // Legacy product: has sizes but no per-size stock yet → start each at 0
+    if (initial?.sizes?.length) {
+      return initial.sizes.map((size) => ({ size, stock: 0 }));
+    }
+    return [];
+  });
+
+  const syncVariantsFromSizes = (sizes: string[]) => {
+    setVariants((prev) => {
+      const next = sizes.map((size) => {
+        const existing = prev.find((v) => v.size === size);
+        return existing ? { ...existing } : { size, stock: 0 };
+      });
+      return next;
+    });
+    // Also sync sizes back into form
+    setForm((prevForm) => ({ ...prevForm, sizes }));
+  };
+
   const [images, setImages] = useState<ImageEntry[]>(() => {
     if (initial?.images) {
       return initial.images.map((url) => ({ kind: "url" as const, url }));
@@ -279,8 +302,15 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     if (!form.price.trim() || Number(form.price) <= 0)
       errors.price = "Enter a valid price greater than 0.";
     if (!form.sku.trim()) errors.sku = "SKU is required.";
-    if (!form.stock.trim() || Number(form.stock) < 0)
+    if (form.sizes.length > 0 && variants.length === 0) {
+      errors.variants = "Add stock for each size variant.";
+    }
+    if (form.sizes.length === 0 && (!form.stock.trim() || Number(form.stock) < 0)) {
       errors.stock = "Stock must be 0 or greater.";
+    }
+    if (form.sizes.length > 0 && variants.some((v) => v.stock < 0)) {
+      errors.variants = "Variant stock must be 0 or greater.";
+    }
     if (images.length === 0)
       errors.images = "Add at least one product image.";
     setFieldErrors(errors);
@@ -322,6 +352,12 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     form.tags.forEach((t) => formData.append("tags", t));
     form.colors.forEach((c) => formData.append("colors", c));
     form.sizes.forEach((s) => formData.append("sizes", s));
+
+    if (variants.length > 0) {
+      const totalStock = variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+      formData.set("stock", String(totalStock));
+      formData.append("variants", JSON.stringify(variants));
+    }
 
     try {
       const fileEntries = images.filter(
@@ -696,7 +732,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         )}
       </SectionCard>
 
-      <SectionCard title="Variants" description="Colors and sizes customers can pick.">
+      <SectionCard title="Variants" description="Sizes with per-size stock. When sizes are set, stock is tracked per size.">
         <div className="grid gap-6 sm:grid-cols-2">
           <ListEditor
             label="Colors"
@@ -708,11 +744,72 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
           <ListEditor
             label="Sizes"
             value={form.sizes}
-            onChange={(next) => set("sizes", next)}
+            onChange={syncVariantsFromSizes}
             placeholder="Type a size and press Enter"
             hint="Suggestions: S, M, L, XL, One Size"
           />
         </div>
+
+        {form.sizes.length > 0 && (
+          <div className="mt-5">
+            <p className="mb-2 text-sm font-semibold text-foreground">
+              Stock per size
+              <span className="ml-1 font-normal text-muted-foreground">
+                (total will be calculated automatically)
+              </span>
+            </p>
+            {fieldErrors.variants && (
+              <p className="mb-2 text-xs font-medium text-destructive">
+                {fieldErrors.variants}
+              </p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {variants.map((variant, i) => (
+                <div
+                  key={variant.size}
+                  className="flex items-center gap-2 rounded-xl border border-border bg-muted/30 p-3"
+                >
+                  <span className="w-12 text-sm font-bold text-foreground">
+                    {variant.size}
+                  </span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={variant.stock}
+                    onChange={(e) => {
+                      setVariants((prev) =>
+                        prev.map((v, idx) =>
+                          idx === i
+                            ? {
+                                ...v,
+                                stock: Number(
+                                  sanitizeWholeNumber(e.target.value) || 0
+                                ),
+                              }
+                            : v
+                        )
+                      );
+                    }}
+                    onKeyDown={(e) => {
+                      if (["-", "+", "e", "E", "."].includes(e.key)) e.preventDefault();
+                    }}
+                    aria-label={`Stock for size ${variant.size}`}
+                    placeholder="0"
+                    className="h-9"
+                  />
+                  <span className="text-xs text-muted-foreground">pcs</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Total stock:{" "}
+              <span className="font-bold text-foreground">
+                {variants.reduce((sum, v) => sum + (v.stock || 0), 0)}
+              </span>{" "}
+              pieces
+            </p>
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard title="Catalog details" description="Features, tags and merchandising flags.">

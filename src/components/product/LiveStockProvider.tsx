@@ -3,7 +3,12 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useGetProductStockQuery } from "@/lib/rtk/storefrontApi";
 
-const LiveStockContext = createContext<Record<string, number>>({});
+export type LiveStockEntry = {
+  stock: number;
+  variants?: Record<string, number>;
+};
+
+const LiveStockContext = createContext<Record<string, LiveStockEntry>>({});
 
 type LiveStockProviderProps = {
   productIds: string[];
@@ -29,7 +34,7 @@ export function LiveStockProvider({ productIds, children }: LiveStockProviderPro
 
 export function useLiveStock(productId: string, fallback = 0) {
   const map = useContext(LiveStockContext);
-  if (productId in map) return map[productId];
+  if (productId in map) return map[productId].stock;
   return fallback;
 }
 

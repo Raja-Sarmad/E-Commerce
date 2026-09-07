@@ -373,7 +373,10 @@ export const storefrontApi = baseApi.injectEndpoints({
       invalidatesTags: ["Coupons"],
     }),
 
-    getProductStock: builder.query<Record<string, number>, string[]>({
+    getProductStock: builder.query<
+      Record<string, { stock: number; variants?: Record<string, number> }>,
+      string[]
+    >({
       query: (ids) => {
         const unique = [...new Set(ids.filter(Boolean))];
         return { url: `/products/stock?ids=${unique.join(",")}` };
@@ -381,15 +384,36 @@ export const storefrontApi = baseApi.injectEndpoints({
       transformResponse: (raw: unknown) => {
         const envelope = raw as { data?: unknown };
         const rows = Array.isArray(envelope?.data)
-          ? (envelope.data as Array<{ id?: string; _id?: string; stock?: number }>)
+          ? (envelope.data as Array<{
+              id?: string;
+              _id?: string;
+              stock?: number;
+              variants?: Array<{ size?: string; stock?: number }>;
+            }>)
           : Array.isArray(raw)
-            ? (raw as Array<{ id?: string; _id?: string; stock?: number }>)
+            ? (raw as Array<{
+                id?: string;
+                _id?: string;
+                stock?: number;
+                variants?: Array<{ size?: string; stock?: number }>;
+              }>)
             : [];
         return Object.fromEntries(
-          rows.map((row) => [
-            String(row.id ?? row._id ?? ""),
-            Math.max(0, Number(row.stock ?? 0)),
-          ])
+          rows.map((row) => {
+            const variants: Record<string, number> = {};
+            if (Array.isArray(row.variants)) {
+              for (const v of row.variants) {
+                if (v.size) variants[v.size] = Math.max(0, Number(v.stock ?? 0));
+              }
+            }
+            return [
+              String(row.id ?? row._id ?? ""),
+              {
+                stock: Math.max(0, Number(row.stock ?? 0)),
+                variants: Object.keys(variants).length > 0 ? variants : undefined,
+              },
+            ];
+          })
         );
       },
       keepUnusedDataFor: 0,

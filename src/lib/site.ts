@@ -30,26 +30,26 @@ export const navLinks = [
 ];
 
 export const footerLinks = {
-  shop: [
-    { label: "Electronics", href: "/shop?category=electronics" },
-    { label: "Fashion", href: "/shop?category=fashion" },
-    { label: "Home & Living", href: "/shop?category=home-living" },
-    { label: "Beauty & Care", href: "/shop?category=beauty-care" },
-    { label: "Sports & Outdoors", href: "/shop?category=sports-outdoors" },
-    { label: "Toys & Kids", href: "/shop?category=toys-kids" },
-  ],
   company: [
     { label: "About Us", href: "/about" },
+    { label: "Catalog", href: "/#catalog" },
+    { label: "Categories", href: "/categories" },
     { label: "Contact", href: "/contact" },
     { label: "Blog", href: "/blog" },
-    { label: "Careers", href: "/about" },
-    { label: "Press", href: "/about" },
+    { label: "FAQ", href: "/faq" },
   ],
-  support: [
-    { label: "Help Center", href: "/faq" },
+  policies: [
     { label: "Privacy Policy", href: "/privacy-policy" },
-    { label: "Terms & Conditions", href: "/terms" },
-    { label: "Shipping & Delivery", href: "/faq" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Shipping Policy", href: "/faq" },
     { label: "Returns & Refunds", href: "/faq" },
+    { label: "Cancellation Policy", href: "/terms" },
+  ],
+  shop: [
+    { label: "Shop All", href: "/#catalog" },
+    { label: "Full Catalog", href: "/shop" },
+    { label: "New Arrivals", href: "/shop?sort=newest" },
+    { label: "Wishlist", href: "/wishlist" },
+    { label: "My Orders", href: "/orders" },
   ],
 };

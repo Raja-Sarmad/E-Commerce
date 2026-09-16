@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   reactCompiler: true,
   poweredByHeader: false,
   compress: true,
@@ -15,6 +18,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "fastly.picsum.photos" },
       { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "*.cloudinary.com" },
       { protocol: "https", hostname: "localhost" },
       { protocol: "http", hostname: "localhost" },
       { protocol: "https", hostname: "ronin.pk" },

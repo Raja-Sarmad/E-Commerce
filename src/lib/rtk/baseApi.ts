@@ -85,7 +85,7 @@ export const baseApi = createApi({
   refetchOnMountOrArgChange: 60,
   refetchOnFocus: false,
   refetchOnReconnect: true,
-  tagTypes: ["Auth", "User", "Products", "Product", "Categories", "Brands", "Media", "Orders", "Dashboard", "Users", "Reviews", "Blog", "Banners", "Settings", "Wishlist", "Coupons", "Shipping", "Payments"],
+  tagTypes: ["Auth", "User", "Products", "Product", "Categories", "Brands", "Media", "Orders", "Dashboard", "Users", "Reviews", "Blog", "Banners", "Reels", "Settings", "Wishlist", "Coupons", "Shipping", "Payments"],
   endpoints: () => ({}),
 });
 

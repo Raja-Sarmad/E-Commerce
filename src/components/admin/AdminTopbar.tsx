@@ -551,6 +551,7 @@ function navTitle(pathname: string): string {
     reviews: "Reviews",
     blog: "Blog",
     banners: "Banners",
+    reels: "Reels",
     pages: "Pages",
     faq: "FAQ",
     newsletter: "Newsletter",

@@ -62,7 +62,11 @@ function normalizeProduct(p: Record<string, unknown>): Product {
     specifications: (p.specifications as Record<string, string>) ?? {},
     price: Number(p.price ?? 0),
     compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : undefined,
-    images: Array.isArray(p.images) ? (p.images as string[]) : [],
+    images: Array.isArray(p.images)
+      ? (p.images as string[])
+          .map((img) => String(img ?? "").trim())
+          .filter(Boolean)
+      : [],
     rating: Number(p.rating ?? 0),
     reviewsCount: Number(p.reviewsCount ?? 0),
     totalSold: Number(p.totalSold ?? 0),
@@ -143,21 +147,21 @@ export const storefrontApi = baseApi.injectEndpoints({
         const qs = new URLSearchParams(buildProductQuery(query));
         return { url: `/products${qs.toString() ? `?${qs.toString()}` : ""}` };
       },
-      transformResponse: (raw: unknown) => {
-        const envelope = raw as { data?: unknown; meta?: unknown };
-        const items = Array.isArray(envelope?.data)
-          ? (envelope.data as Array<Record<string, unknown>>)
-          : Array.isArray(raw)
-            ? (raw as Array<Record<string, unknown>>)
+      transformResponse: (raw: unknown, meta: unknown) => {
+        const items = Array.isArray(raw)
+          ? (raw as Array<Record<string, unknown>>)
+          : Array.isArray((raw as { data?: unknown })?.data)
+            ? ((raw as { data: unknown[] }).data as Array<Record<string, unknown>>)
             : [];
         const products = items.map(normalizeProduct);
-        const meta = (envelope?.meta as ListMeta) ?? {
-          page: 1,
-          limit: 12,
-          total: products.length,
-          totalPages: 1,
-        };
-        return { products, meta };
+        const pagination = (meta as ListMeta | undefined) ??
+          ((raw as { meta?: ListMeta })?.meta) ?? {
+            page: 1,
+            limit: 12,
+            total: products.length,
+            totalPages: Math.max(1, Math.ceil(products.length / 12)),
+          };
+        return { products, meta: pagination };
       },
       providesTags: ["Products"],
     }),
@@ -418,11 +422,42 @@ export const storefrontApi = baseApi.injectEndpoints({
       },
       keepUnusedDataFor: 0,
     }),
+
+    getStorefrontReels: builder.query<
+      Array<{
+        id: string;
+        title: string;
+        video: string;
+        poster?: string;
+        link?: string;
+        slot: number;
+      }>,
+      void
+    >({
+      query: () => "/reels",
+      transformResponse: (response: unknown) => {
+        const rows = Array.isArray(response)
+          ? response
+          : Array.isArray((response as { data?: unknown[] })?.data)
+            ? (response as { data: unknown[] }).data
+            : [];
+        return rows.map((row: Record<string, unknown>) => ({
+          id: String(row.id ?? row._id ?? ""),
+          title: String(row.title ?? ""),
+          video: String(row.video ?? ""),
+          poster: row.poster ? String(row.poster) : undefined,
+          link: row.link ? String(row.link) : undefined,
+          slot: Number(row.slot ?? 0),
+        }));
+      },
+      providesTags: [{ type: "Reels", id: "LIST" }],
+    }),
   }),
 });
 
 export const {
   useGetStorefrontProductsQuery,
+  useLazyGetStorefrontProductsQuery,
   useGetStorefrontProductBySlugQuery,
   useGetStorefrontCategoriesQuery,
   useGetStorefrontCategoryBySlugQuery,
@@ -430,6 +465,7 @@ export const {
   useGetStorefrontBlogPostsQuery,
   useGetStorefrontBlogPostBySlugQuery,
   useGetStorefrontBannersQuery,
+  useGetStorefrontReelsQuery,
   useGetStorefrontFaqsQuery,
   useGetStorefrontFaqCategoriesQuery,
   useGetProductReviewsQuery,

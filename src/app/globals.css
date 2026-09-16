@@ -49,6 +49,12 @@
 
   --radius: 0.75rem;
 
+  /* Catalog section — cream + forest palette */
+  --catalog-cream: #f3f0e8;
+  --catalog-forest: #2f4638;
+  --catalog-forest-active: #5c7460;
+  --catalog-forest-muted: #6b7f72;
+
   --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
   --shadow: 0 1px 3px 0 rgb(15 23 42 / 0.1), 0 1px 2px -1px rgb(15 23 42 / 0.1);
   --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.1), 0 2px 4px -2px rgb(15 23 42 / 0.1);
@@ -125,6 +131,11 @@
 
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+
+  --color-catalog-cream: var(--catalog-cream);
+  --color-catalog-forest: var(--catalog-forest);
+  --color-catalog-forest-active: var(--catalog-forest-active);
+  --color-catalog-forest-muted: var(--catalog-forest-muted);
 
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);

@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { TopBar } from "./TopBar";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 
@@ -16,7 +15,6 @@ export function StorefrontChrome({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <TopBar />
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />

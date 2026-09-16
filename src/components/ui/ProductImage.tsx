@@ -20,6 +20,7 @@ const ALLOWED_HOSTS = [
   "fastly.picsum.photos",
   "images.unsplash.com",
   "res.cloudinary.com",
+  "cloudinary.com",
   "localhost",
   "ronin.pk",
   "encrypted-tbn0.gstatic.com",
@@ -32,12 +33,20 @@ const FALLBACK = `data:image/svg+xml,${encodeURIComponent(
 )}`;
 
 function isAllowedHost(url: string): boolean {
+  if (url.startsWith("/")) return true;
   try {
     const hostname = new URL(url).hostname;
     return ALLOWED_HOSTS.some((h) => hostname === h || hostname.endsWith(`.${h}`));
   } catch {
     return false;
   }
+}
+
+function resolveImageSrc(src: string): string {
+  const trimmed = src?.trim() ?? "";
+  if (!trimmed) return "";
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  return trimmed;
 }
 
 export function ProductImage({
@@ -50,22 +59,31 @@ export function ProductImage({
   fill = true,
 }: ProductImageProps) {
   const [failed, setFailed] = useState(false);
-  const safeSrc = src || "";
+  const safeSrc = resolveImageSrc(src);
   const resolved = failed || !safeSrc ? FALLBACK : safeSrc;
-  const useNextImage = fill && safeSrc && isAllowedHost(resolved);
+  const useNextImage = safeSrc && isAllowedHost(resolved);
 
   return (
-    <div className={cn("relative overflow-hidden bg-muted", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden bg-muted",
+        fill && "absolute inset-0 h-full w-full",
+        className
+      )}
+    >
       {useNextImage ? (
         <Image
           src={resolved}
           alt={alt}
-          fill
+          fill={fill}
+          width={fill ? undefined : 600}
+          height={fill ? undefined : 600}
           sizes={sizes}
           priority={priority}
           onError={() => setFailed(true)}
           className={cn(
             "object-cover transition-transform duration-500",
+            fill && "absolute inset-0 h-full w-full",
             imgClassName
           )}
         />
@@ -77,6 +95,7 @@ export function ProductImage({
           onError={() => setFailed(true)}
           className={cn(
             "h-full w-full object-cover transition-transform duration-500",
+            fill && "absolute inset-0",
             imgClassName
           )}
         />

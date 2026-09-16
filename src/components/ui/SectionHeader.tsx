@@ -11,6 +11,7 @@ type SectionHeaderProps = {
   align?: "left" | "center";
   className?: string;
   badge?: string;
+  titleId?: string;
 };
 
 export function SectionHeader({
@@ -21,6 +22,7 @@ export function SectionHeader({
   align = "left",
   className,
   badge,
+  titleId,
 }: SectionHeaderProps) {
   return (
     <div
@@ -36,7 +38,10 @@ export function SectionHeader({
             {badge}
           </span>
         )}
-        <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <h2
+          id={titleId}
+          className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+        >
           {title}
         </h2>
         {subtitle && (

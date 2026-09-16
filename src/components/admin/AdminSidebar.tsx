@@ -29,6 +29,7 @@ import {
   FiTruck,
   FiUserCheck,
   FiUsers,
+  FiVideo,
   FiX,
 } from "react-icons/fi";
 import { Badge } from "@/components/ui/Badge";
@@ -86,6 +87,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Blog", href: "/admin/blog", icon: FiEdit2 },
       { label: "Banners", href: "/admin/banners", icon: FiImage },
+      { label: "Reels", href: "/admin/reels", icon: FiVideo },
       { label: "Pages", href: "/admin/pages", icon: FiLayout },
       { label: "FAQ", href: "/admin/faq", icon: FiHelpCircle },
     ],

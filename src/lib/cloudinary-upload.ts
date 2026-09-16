@@ -56,3 +56,36 @@ export async function uploadFilesToCloudinary(files: File[]): Promise<Cloudinary
   }
   return results;
 }
+
+/** Upload video to Cloudinary from the browser. */
+export async function uploadVideoToCloudinary(file: File): Promise<CloudinaryUploadResult> {
+  const { cloudName, uploadPreset, folder } = getCloudinaryConfig();
+  const videoFolder = folder.replace(/\/products?$/, "/reels");
+
+  const form = new FormData();
+  form.append("file", file);
+  form.append("upload_preset", uploadPreset);
+  form.append("folder", videoFolder);
+  form.append("resource_type", "video");
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+    { method: "POST", body: form }
+  );
+
+  const result = (await response.json()) as {
+    secure_url?: string;
+    public_id?: string;
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new Error(result?.error?.message || "Video upload failed.");
+  }
+
+  if (!result.secure_url || !result.public_id) {
+    throw new Error("Cloudinary did not return a valid video URL.");
+  }
+
+  return { url: result.secure_url, publicId: result.public_id };
+}

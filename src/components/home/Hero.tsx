@@ -1,118 +1,115 @@
-import Link from "next/link";
-import { FiArrowRight, FiShoppingBag } from "react-icons/fi";
-import { Container } from "@/components/ui/Container";
-import { Button } from "@/components/ui/Button";
-import { ProductImage } from "@/components/ui/ProductImage";
-import { Badge } from "@/components/ui/Badge";
-import { FreeShippingText } from "@/components/ui/FreeShippingText";
+"use client";
 
-const slides = [
+import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import { FiChevronDown } from "react-icons/fi";
+import { cn } from "@/lib/utils";
+
+type HeroSlide = {
+  id: string;
+  image: string;
+  bottomTitle: string;
+};
+
+const slides: HeroSlide[] = [
   {
     id: "hero-1",
-    kicker: "New Season Drop",
-    title: "Sound that moves you",
-    subtitle:
-      "The Aurora Wireless Headphones Pro — studio-grade audio with 45dB noise cancellation and 40-hour battery.",
-    cta: { label: "Shop Headphones", href: "/shop?category=electronics" },
-    image:
-      "https://picsum.photos/seed/aurora-wireless-headphones-pro-1/900/900",
-    accent: "from-primary/90 to-primary-strong/80",
+    image: "/images/hero1.webp",
+    bottomTitle: "FESTIVE UNSTITCHED",
+  },
+  {
+    id: "hero-2",
+    image: "/images/hero2.webp",
+    bottomTitle: "FESTIVE PRET",
+  },
+  {
+    id: "hero-3",
+    image: "/images/hero3.webp",
+    bottomTitle: "NEW COLLECTION",
   },
 ];
 
+const AUTOPLAY_MS = 7000;
+
 export function Hero() {
-  const slide = slides[0];
+  const [active, setActive] = useState(0);
+
+  const goTo = useCallback((index: number) => {
+    setActive((index + slides.length) % slides.length);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActive((prev) => (prev + 1) % slides.length);
+    }, AUTOPLAY_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const scrollToContent = () => {
+    const target = document.getElementById("home-content");
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const slide = slides[active];
+
   return (
-    <section aria-label="Featured banner" className="relative">
-      <Container className="pt-4 sm:pt-6">
-        <div className="relative overflow-hidden rounded-3xl bg-foreground">
+    <section aria-label="Featured collection" className="relative w-full bg-card">
+      <div className="relative min-h-[520px] overflow-hidden sm:min-h-[600px] lg:min-h-[680px]">
+        {slides.map((item, index) => (
           <div
-            className={`absolute inset-0 bg-gradient-to-r ${slide.accent}`}
-            aria-hidden
-          />
-          <div
-            className="absolute inset-0 opacity-[0.08]"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 2px 2px, white 1.5px, transparent 0)",
-              backgroundSize: "32px 32px",
-            }}
-            aria-hidden
-          />
-          <div className="relative grid gap-0 lg:grid-cols-2">
-            <div className="flex flex-col justify-center px-6 py-12 text-white sm:px-12 sm:py-16 lg:py-24">
-              <Badge
-                variant="accent"
-                className="w-fit text-background"
-              >
-                {slide.kicker}
-              </Badge>
-              <h1 className="mt-5 max-w-md text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-                {slide.title}
-              </h1>
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">
-                {slide.subtitle}
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Button href={slide.cta.href} variant="accent" size="lg">
-                  <FiShoppingBag className="h-5 w-5" aria-hidden />
-                  {slide.cta.label}
-                </Button>
-                <Button
-                  href="/shop?sale=on"
-                  variant="ghost"
-                  size="lg"
-                  className="border border-white/25 text-white hover:bg-white/10"
-                >
-                  View Flash Sale
-                  <FiArrowRight className="h-4 w-4" aria-hidden />
-                </Button>
-              </div>
-              <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4">
-                {[
-                  ["50k+", "Happy customers"],
-                  ["4.8/5", "Average rating"],
-                  ["24h", "Fast delivery"],
-                ].map(([value, label]) => (
-                  <div key={label}>
-                    <dt className="text-xl font-extrabold sm:text-2xl">
-                      {value}
-                    </dt>
-                    <dd className="text-xs text-white/70">{label}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-            <div className="relative hidden lg:block">
-              <div className="absolute inset-0 flex items-center justify-center p-10">
-                <div className="animate-float relative aspect-square w-full max-w-md">
-                  <ProductImage
-                    src={slide.image}
-                    alt={slide.title}
-                    className="h-full w-full rounded-3xl shadow-2xl"
-                  />
-                  <div className="absolute -left-6 top-10 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-md">
-                    <p className="text-[10px] uppercase tracking-wide text-white/70">
-                      Best Seller
-                    </p>
-                    <p className="text-sm font-bold text-white">
-                      -20% this week
-                    </p>
-                  </div>
-                  <div className="absolute -bottom-5 right-8 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-md">
-                    <p className="text-[10px] uppercase tracking-wide text-white/70">
-                      Free shipping
-                    </p>
-                    <p className="text-sm font-bold text-white">
-                      <FreeShippingText prefix="On orders " suffix="+" />
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            key={item.id}
+            className={cn(
+              "absolute inset-0 transition-opacity duration-1000 ease-in-out",
+              index === active ? "opacity-100" : "pointer-events-none opacity-0"
+            )}
+            aria-hidden={index !== active}
+          >
+            <Image
+              src={item.image}
+              alt=""
+              fill
+              priority={index === 0}
+              sizes="100vw"
+              className="object-cover object-center"
+            />
+            <div
+              className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/30 to-transparent"
+              aria-hidden
+            />
           </div>
+        ))}
+
+        <p className="absolute bottom-12 left-1/2 z-20 -translate-x-1/2 text-[11px] font-normal uppercase tracking-[0.42em] text-white sm:bottom-14 sm:text-xs">
+          {slide.bottomTitle}
+        </p>
+
+        <div className="absolute right-4 bottom-12 z-20 flex items-center gap-2.5 sm:right-6 sm:bottom-14">
+          {slides.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-label={`Go to slide ${index + 1}`}
+              aria-current={index === active ? "true" : undefined}
+              onClick={() => goTo(index)}
+              className={cn(
+                "rounded-full transition-all duration-300",
+                index === active
+                  ? "h-3 w-3 border border-white bg-transparent"
+                  : "h-1.5 w-1.5 bg-white/75 hover:bg-white"
+              )}
+            />
+          ))}
         </div>
-      </Container>
+      </div>
+
+      <button
+        type="button"
+        onClick={scrollToContent}
+        aria-label="Scroll to collections"
+        className="absolute bottom-0 left-1/2 z-30 flex h-11 w-11 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.12)] transition-transform hover:scale-105 sm:h-12 sm:w-12"
+      >
+        <FiChevronDown className="h-5 w-5 text-neutral-400" aria-hidden />
+      </button>
     </section>
   );
 }

@@ -37,6 +37,17 @@ export type ListResponse<T> = {
 export type AdminCategory = { _id: string; name: string; slug: string; description: string; image: string; icon?: string; count: number; featured: boolean; isActive: boolean; parent?: string; order: number };
 export type AdminBrand = { _id: string; name: string; slug: string; logo: string; description: string; isActive: boolean };
 export type AdminBanner = { _id: string; title: string; position: string; image: string; link: string; subtitle: string; startsAt?: string; endsAt?: string; active: boolean; views: number; clicks: number };
+export type AdminReel = {
+  _id: string;
+  title: string;
+  video: string;
+  poster: string;
+  publicId?: string;
+  link: string;
+  slot: number;
+  active: boolean;
+  createdAt?: string;
+};
 export type AdminBlogPost = { _id: string; title: string; slug: string; excerpt: string; content: string; coverImage: string; category: string; author: string; authorAvatar: string; readTime: number; tags: string[]; featured: boolean; status: string; views: number; scheduledAt?: string; createdAt: string };
 export type AdminVendor = { _id: string; user?: string; name: string; logo: string; email: string; phone: string; description: string; rating: number; verified: boolean; status: string; productsCount: number; totalEarnings: number; pendingPayout: number; commissionRate: number; createdAt: string };
 export type AdminReview = { _id: string; product?: { name: string; slug: string }; user?: { name: string; email: string }; name: string; rating: number; title: string; body: string; verified: boolean; helpful: number; status: string; createdAt: string };
@@ -288,6 +299,28 @@ export const adminApi = baseApi.injectEndpoints({
     deleteBanner: builder.mutation<unknown, string>({
       query: (id) => ({ url: `/banners/admin/${id}`, method: "DELETE" }),
       invalidatesTags: ["Banners"],
+    }),
+
+    /* ── Reels ─────────────────────────────────────────────────── */
+    getAdminReels: builder.query<AdminReel[], void>({
+      query: () => ({ url: "/reels/admin/list" }),
+      transformResponse: (raw: unknown) => {
+        const data = (raw as { data?: unknown })?.data ?? raw;
+        return (Array.isArray(data) ? data : []) as AdminReel[];
+      },
+      providesTags: ["Reels"],
+    }),
+    createReel: builder.mutation<AdminReel, Partial<AdminReel>>({
+      query: (body) => ({ url: "/reels/admin", method: "POST", body }),
+      invalidatesTags: ["Reels"],
+    }),
+    updateReel: builder.mutation<AdminReel, { id: string; body: Partial<AdminReel> }>({
+      query: ({ id, body }) => ({ url: `/reels/admin/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["Reels"],
+    }),
+    deleteReel: builder.mutation<unknown, string>({
+      query: (id) => ({ url: `/reels/admin/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Reels"],
     }),
 
     /* ── Blog ──────────────────────────────────────────────────── */
@@ -680,6 +713,11 @@ export const {
   useCreateBannerMutation,
   useUpdateBannerMutation,
   useDeleteBannerMutation,
+  // Reels
+  useGetAdminReelsQuery,
+  useCreateReelMutation,
+  useUpdateReelMutation,
+  useDeleteReelMutation,
   // Blog
   useGetAdminBlogPostsQuery,
   useCreateBlogPostMutation,

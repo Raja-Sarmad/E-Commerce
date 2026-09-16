@@ -17,11 +17,14 @@ import {
 type CurrencySelectorProps = {
   className?: string;
   compact?: boolean;
+  /** Text-only style for minimal navbars. */
+  minimal?: boolean;
 };
 
 export function CurrencySelector({
   className,
   compact = false,
+  minimal = false,
 }: CurrencySelectorProps) {
   const mounted = useMounted();
   const dispatch = useDispatch();
@@ -50,19 +53,28 @@ export function CurrencySelector({
         aria-label="Select currency"
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted",
-          compact && "h-10 px-2"
+          "flex items-center gap-1 text-sm text-foreground transition-opacity hover:opacity-70",
+          !minimal &&
+            "gap-1.5 rounded-lg border border-border bg-card px-2.5 py-2 font-semibold transition-colors hover:bg-muted hover:opacity-100",
+          compact && !minimal && "h-10 px-2",
+          minimal && "font-normal"
         )}
       >
-        <FiGlobe className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        {!minimal && (
+          <FiGlobe className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        )}
         <span>{displayCode}</span>
-        {!compact && (
+        {!compact && !minimal && (
           <span className="hidden text-xs font-normal text-muted-foreground sm:inline">
             {displayMeta?.symbol}
           </span>
         )}
         <FiChevronDown
-          className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")}
+          className={cn(
+            "h-3.5 w-3.5 text-foreground/60 transition-transform",
+            !minimal && "h-4 w-4 text-muted-foreground",
+            open && "rotate-180"
+          )}
           aria-hidden
         />
       </button>

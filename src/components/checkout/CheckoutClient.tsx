@@ -174,6 +174,19 @@ export default function CheckoutClient() {
     setProcessing(true);
 
     try {
+      const missingSize = items.find((i) => {
+        const variants = i.product?.variants;
+        return !!variants && variants.length > 0 && !i.size;
+      });
+      if (missingSize) {
+        toast.error(
+          "Select a size",
+          `"${missingSize.product?.name}" has size-based stock. Please re-add it with a size selected.`
+        );
+        router.push("/cart");
+        return;
+      }
+
       const fresh = await refetchStock();
       const stockMap = fresh.data;
       if (stockMap) {

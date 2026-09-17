@@ -36,6 +36,9 @@ export type Product = {
   description: string;
   features: string[];
   specifications: Record<string, string>;
+  materials?: string;
+  sizeGuide?: string;
+  shippingInfo?: string;
   price: number;
   compareAtPrice?: number;
   images: string[];

@@ -166,6 +166,10 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+}
+
 html {
   scroll-padding-top: 5rem;
 }

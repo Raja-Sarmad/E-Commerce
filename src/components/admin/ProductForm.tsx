@@ -140,6 +140,9 @@ const emptyForm = {
   category: "",
   categorySlug: "",
   description: "",
+  materials: "",
+  sizeGuide: "",
+  shippingInfo: "",
   features: [] as string[],
   price: "",
   compareAtPrice: "",
@@ -203,6 +206,9 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
           category: initial.category,
           categorySlug: initial.categorySlug,
           description: initial.description,
+          materials: initial.materials ?? "",
+          sizeGuide: initial.sizeGuide ?? "",
+          shippingInfo: initial.shippingInfo ?? "",
           features: [...initial.features],
           // stored as USD in DB, show in active currency
           price: usdToActive(initial.price),
@@ -331,6 +337,9 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     formData.append("category", form.category);
     formData.append("categorySlug", form.categorySlug);
     formData.append("description", form.description.trim());
+    formData.append("materials", form.materials.trim());
+    formData.append("sizeGuide", form.sizeGuide.trim());
+    formData.append("shippingInfo", form.shippingInfo.trim());
     // Convert active currency → USD before saving to database
     const priceUsd = activeToUsd(form.price);
     const compareAtPriceUsd = form.compareAtPrice ? activeToUsd(form.compareAtPrice) : 0;
@@ -812,6 +821,32 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         )}
       </SectionCard>
 
+      <SectionCard
+        title="Product page tabs"
+        description="Optional content for Materials, Size & Fit, and Shipping tabs on the product page."
+      >
+        <div className="grid gap-4 sm:grid-cols-1">
+          <Textarea
+            label="Materials"
+            value={form.materials}
+            onChange={(e) => set("materials", e.target.value)}
+            placeholder="Fabric composition, care instructions, material quality..."
+          />
+          <Textarea
+            label="Size & fit guide"
+            value={form.sizeGuide}
+            onChange={(e) => set("sizeGuide", e.target.value)}
+            placeholder="Runs true to size. Size up for relaxed fit..."
+          />
+          <Textarea
+            label="Shipping & returns"
+            value={form.shippingInfo}
+            onChange={(e) => set("shippingInfo", e.target.value)}
+            placeholder="Leave empty to use store defaults."
+          />
+        </div>
+      </SectionCard>
+
       <SectionCard title="Catalog details" description="Features, tags and merchandising flags.">
         <div className="space-y-5">
           <ListEditor
@@ -819,7 +854,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             value={form.features}
             onChange={(next) => set("features", next)}
             placeholder="Add a product feature"
-            hint="Short bullet points shown on the product page"
+            hint="Shown as icon bullets under the Details tab"
           />
           <ListEditor
             label="Tags"

@@ -60,6 +60,9 @@ function normalizeProduct(p: Record<string, unknown>): Product {
     description: String(p.description ?? ""),
     features: Array.isArray(p.features) ? (p.features as string[]) : [],
     specifications: (p.specifications as Record<string, string>) ?? {},
+    materials: p.materials ? String(p.materials) : undefined,
+    sizeGuide: p.sizeGuide ? String(p.sizeGuide) : undefined,
+    shippingInfo: p.shippingInfo ? String(p.shippingInfo) : undefined,
     price: Number(p.price ?? 0),
     compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : undefined,
     images: Array.isArray(p.images)

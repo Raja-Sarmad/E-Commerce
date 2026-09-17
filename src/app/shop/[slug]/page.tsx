@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FiCheck } from "react-icons/fi";
-import { Container } from "@/components/ui/Container";
-import { Breadcrumb } from "@/components/ui/Breadcrumb";
-import { Tabs } from "@/components/ui/Tabs";
+import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductDetails } from "@/components/product/ProductDetails";
-import { ReviewsSection } from "@/components/product/ReviewsSection";
-import { ProductSection } from "@/components/home/ProductSection";
+import { ProductPageTabs } from "@/components/product/ProductPageTabs";
+import { RelatedProductCard } from "@/components/product/RelatedProductCard";
+import { LiveStockProvider } from "@/components/product/LiveStockProvider";
 import { getProductBySlug } from "@/lib/api/server";
 
 export const revalidate = 60;
@@ -54,98 +53,60 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const { related } = product;
 
-  const specsEntries = product.specifications ? Object.entries(product.specifications as Record<string, unknown>) : [];
-
   return (
-    <div className="py-6">
-      <Container>
-        <Breadcrumb
-          items={[
-            { label: "Shop", href: "/shop" },
-            { label: product.category, href: `/shop?category=${product.categorySlug}` },
-            { label: product.name },
-          ]}
-        />
+    <div className="bg-background">
+      <section className="bg-secondary px-5 pt-6 pb-10 sm:px-8 sm:pt-8 sm:pb-12 lg:px-12">
+        <div className="mx-auto max-w-6xl">
+          <Link
+            href="/#catalog"
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+          >
+            <FiArrowLeft className="h-4 w-4" aria-hidden />
+            Back to catalog
+          </Link>
 
-        <div className="grid gap-10 lg:grid-cols-2">
-          <ProductGallery images={product.images} name={product.name} />
-          <ProductDetails product={product} />
-        </div>
+          <div className="mt-4 overflow-hidden rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-6 lg:p-7">
+            <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
+              <ProductGallery images={product.images} name={product.name} />
+              <ProductDetails product={product} />
+            </div>
+          </div>
 
-        <div className="mt-16">
-          <Tabs
-            defaultKey="description"
-            tabs={[
-              {
-                key: "description",
-                label: "Description",
-                content: (
-                  <div className="max-w-3xl space-y-4">
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {product.description}
-                    </p>
-                    <div>
-                      <h4 className="mb-3 text-sm font-bold text-foreground">
-                        Key features
-                      </h4>
-                      <ul className="grid gap-2 sm:grid-cols-2">
-                        {product.features.map((feature) => (
-                          <li
-                            key={feature}
-                            className="flex items-start gap-2 text-sm text-muted-foreground"
-                          >
-                            <FiCheck
-                              className="mt-0.5 h-4 w-4 shrink-0 text-success"
-                              aria-hidden
-                            />
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                key: "specifications",
-                label: "Specifications",
-                content: (
-                  <div className="max-w-3xl overflow-hidden rounded-2xl border border-border bg-card">
-                    <dl>
-                      {specsEntries.map(([key, value], index) => (
-                        <div
-                          key={key}
-                          className={`grid grid-cols-[180px_1fr] gap-4 px-5 py-3.5 text-sm ${
-                            index % 2 === 0 ? "bg-muted/40" : ""
-                          }`}
-                        >
-                          <dt className="font-semibold text-foreground">{key}</dt>
-                          <dd className="text-muted-foreground">{String(value)}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                ),
-              },
-              {
-                key: "reviews",
-                label: `Reviews (${product.reviewsCount.toLocaleString()})`,
-                content: <ReviewsSection product={product} />,
-              },
-            ]}
-          />
+          <ProductPageTabs product={product} />
         </div>
+      </section>
 
-        <div className="mt-16">
-          <ProductSection
-            badge="You may also like"
-            title="Related products"
-            subtitle="Customers who viewed this item also looked at these."
-            products={related}
-            columns={4}
-          />
-        </div>
-      </Container>
+      {related.length > 0 ? (
+        <section
+          className="border-t border-border/70 bg-background px-5 py-10 sm:px-8 sm:py-12 lg:px-12"
+          aria-labelledby="related-heading"
+        >
+          <div className="mx-auto max-w-6xl">
+            <div className="flex items-center justify-between gap-4">
+              <h2
+                id="related-heading"
+                className="text-xl font-bold tracking-tight text-foreground sm:text-2xl"
+              >
+                You May Also Like
+              </h2>
+              <Link
+                href={`/shop?category=${product.categorySlug}`}
+                className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+              >
+                View All
+                <FiArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </div>
+            <LiveStockProvider productIds={related.map((p) => p.id)}>
+              <div className="mt-6 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-4">
+                {related.slice(0, 4).map((item) => (
+                  <RelatedProductCard key={item.id} product={item} />
+                ))}
+              </div>
+            </LiveStockProvider>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -33,6 +33,8 @@ export type Product = {
   brand: string;
   category: string;
   categorySlug: string;
+  /** Fashion style: stitched | unstitched | modelwear */
+  wearType?: "stitched" | "unstitched" | "modelwear" | "";
   description: string;
   features: string[];
   specifications: Record<string, string>;

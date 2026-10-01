@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery, type BaseQueryFn, type FetchArgs, type FetchBaseQueryError, type FetchBaseQueryMeta } from "@reduxjs/toolkit/query/react";
 import { API_URL } from "../api/config";
+import { DEFAULT_STORE_SLUG } from "../store/config";
 import { clearAuthCookies, setAccessToken } from "./authSlice";
 import type { RootState } from "./store";
 
@@ -16,8 +17,11 @@ const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_URL,
   credentials: "include",
   prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as RootState).auth.accessToken;
+    const state = getState() as RootState;
+    const token = state.auth.accessToken;
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    const storeSlug = state.store?.slug || DEFAULT_STORE_SLUG;
+    headers.set("X-Store-Slug", storeSlug);
     return headers;
   },
 });
@@ -85,7 +89,7 @@ export const baseApi = createApi({
   refetchOnMountOrArgChange: 60,
   refetchOnFocus: false,
   refetchOnReconnect: true,
-  tagTypes: ["Auth", "User", "Products", "Product", "Categories", "Brands", "Media", "Orders", "Dashboard", "Users", "Reviews", "Blog", "Banners", "Reels", "Settings", "Wishlist", "Coupons", "Shipping", "Payments"],
+  tagTypes: ["Auth", "User", "Products", "Product", "Categories", "Brands", "Media", "Orders", "Dashboard", "Users", "Reviews", "Blog", "Banners", "Reels", "Settings", "Wishlist", "Coupons", "Shipping", "Payments", "Stores"],
   endpoints: () => ({}),
 });
 

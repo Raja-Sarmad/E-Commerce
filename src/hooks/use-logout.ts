@@ -2,20 +2,28 @@
 
 import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useLogoutMutation } from "@/lib/rtk/authApi";
 import { clearAuthCookies } from "@/lib/rtk/authSlice";
 import { switchCartOwner } from "@/lib/rtk/cartSlice";
 import { baseApi } from "@/lib/rtk/baseApi";
+import { selectStoreSlug } from "@/lib/rtk/storeSlice";
+
+const VEYA_LOGIN_URL =
+  process.env.NEXT_PUBLIC_COSMETIC_SITE_URL?.replace(/\/$/, "") ||
+  "http://localhost:3001";
 
 export function useLogout() {
   const [logoutMutation] = useLogoutMutation();
   const dispatch = useDispatch();
   const router = useRouter();
+  const storeSlug = useSelector(selectStoreSlug);
   const busyRef = useRef(false);
 
   const logout = useCallback(
     async (redirectTo = "/login") => {
+      const destination =
+        storeSlug === "cosmetic" ? `${VEYA_LOGIN_URL}/login` : redirectTo;
       if (busyRef.current) return;
       busyRef.current = true;
       try {
@@ -27,10 +35,14 @@ export function useLogout() {
         dispatch(clearAuthCookies());
         dispatch(baseApi.util.resetApiState());
         busyRef.current = false;
-        router.push(redirectTo);
+        if (destination.startsWith("http")) {
+          window.location.href = destination;
+        } else {
+          router.push(destination);
+        }
       }
     },
-    [dispatch, logoutMutation, router]
+    [dispatch, logoutMutation, router, storeSlug]
   );
 
   return { logout };

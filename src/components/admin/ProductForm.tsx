@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import {
+  FiAward,
   FiGrid,
   FiLink,
   FiPlus,
@@ -23,6 +24,7 @@ import {
   useCreateProductMutation,
   useUpdateProductMutation,
   useGetAdminCategoriesQuery,
+  useGetAdminBrandsQuery,
 } from "@/lib/rtk/adminApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { uploadFileToCloudinary } from "@/lib/cloudinary-upload";
@@ -30,6 +32,7 @@ import { slugify, sanitizePositiveDecimal, sanitizeWholeNumber } from "@/lib/uti
 import { cn } from "@/lib/utils";
 import { useFormatPrice } from "@/hooks/use-format-price";
 import { selectCurrencyMeta } from "@/lib/rtk/currencySlice";
+import { selectStoreLabel, selectStoreSlug } from "@/lib/rtk/storeSlice";
 import type { Product, ProductVariant } from "@/lib/types";
 
 const maxImageSizeMb = 5;
@@ -133,12 +136,31 @@ type ProductFormProps = {
   mode: "create" | "edit";
 };
 
+const WEAR_TYPE_OPTIONS = [
+  {
+    value: "stitched" as const,
+    label: "Stitched",
+    hint: "Ready-made / stitched outfit",
+  },
+  {
+    value: "unstitched" as const,
+    label: "Unstitched",
+    hint: "Unstitched fabric / suit",
+  },
+  {
+    value: "modelwear" as const,
+    label: "Model Wear",
+    hint: "Styled model-wear look",
+  },
+];
+
 const emptyForm = {
   name: "",
   slug: "",
   brand: "",
   category: "",
   categorySlug: "",
+  wearType: "" as "" | "stitched" | "unstitched" | "modelwear",
   description: "",
   materials: "",
   sizeGuide: "",
@@ -162,9 +184,13 @@ const emptyForm = {
 export function ProductForm({ initial, mode }: ProductFormProps) {
   const formatPrice = useFormatPrice();
   const currencyMeta = useSelector(selectCurrencyMeta);
+  const storeLabel = useSelector(selectStoreLabel);
+  const storeSlug = useSelector(selectStoreSlug);
   const router = useRouter();
   const { data: categoryData, isLoading: categoriesLoading } = useGetAdminCategoriesQuery({});
   const categories = categoryData?.items ?? [];
+  const { data: brandData, isLoading: brandsLoading } = useGetAdminBrandsQuery({});
+  const brands = brandData?.items ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [createProduct] = useCreateProductMutation();
   const [updateProduct] = useUpdateProductMutation();
@@ -205,6 +231,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
           brand: initial.brand,
           category: initial.category,
           categorySlug: initial.categorySlug,
+          wearType: (initial.wearType as typeof emptyForm.wearType) || "",
           description: initial.description,
           materials: initial.materials ?? "",
           sizeGuide: initial.sizeGuide ?? "",
@@ -277,6 +304,14 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     });
   }, [categories, mode, initial]);
 
+  useEffect(() => {
+    if (mode !== "create" || initial || brands.length === 0) return;
+    setForm((prev) => {
+      if (prev.brand.trim()) return prev;
+      return { ...prev, brand: brands[0].name };
+    });
+  }, [brands, mode, initial]);
+
   const set = <K extends keyof typeof emptyForm>(
     key: K,
     value: (typeof emptyForm)[K]
@@ -302,9 +337,15 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     !form.categorySlug ||
     categories.some((c) => c.slug === form.categorySlug);
 
+  const hasCurrentBrand =
+    !form.brand.trim() ||
+    brands.some((b) => b.name.toLowerCase() === form.brand.trim().toLowerCase());
+
   const validate = () => {
     const errors: Record<string, string> = {};
+    if (!form.brand.trim()) errors.brand = "Select a brand.";
     if (!form.category.trim()) errors.category = "Select a category.";
+    if (!form.wearType) errors.wearType = "Select stitched, unstitched, or model wear.";
     if (!form.price.trim() || Number(form.price) <= 0)
       errors.price = "Enter a valid price greater than 0.";
     if (!form.sku.trim()) errors.sku = "SKU is required.";
@@ -336,6 +377,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     formData.append("brand", form.brand);
     formData.append("category", form.category);
     formData.append("categorySlug", form.categorySlug);
+    formData.append("wearType", form.wearType);
     formData.append("description", form.description.trim());
     formData.append("materials", form.materials.trim());
     formData.append("sizeGuide", form.sizeGuide.trim());
@@ -454,6 +496,19 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
 
   return (
     <div className="space-y-6">
+      <div
+        className={`rounded-xl border px-4 py-3 text-sm ${
+          storeSlug === "cosmetic"
+            ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+            : "border-primary/30 bg-primary/5 text-foreground"
+        }`}
+      >
+        {mode === "edit" ? "Editing product in" : "New product will be added to"}{" "}
+        <strong>{storeLabel}</strong>
+        {storeSlug === "cosmetic"
+          ? " — visible on the Veya cosmetic site only."
+          : " — visible on the NovaMart e-commerce site only."}
+      </div>
       <SectionCard title="General" description="Core product information shown to customers.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
@@ -464,6 +519,46 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             placeholder="e.g. Aurora Wireless Headphones Pro"
             containerClassName="sm:col-span-2"
           />
+
+          <div className="sm:col-span-2">
+            <p className="text-sm font-medium text-foreground">Product type</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Choose so customers know if this is stitched, unstitched, or model wear.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {WEAR_TYPE_OPTIONS.map((opt) => {
+                const selected = form.wearType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => set("wearType", opt.value)}
+                    className={cn(
+                      "rounded-xl border px-4 py-3 text-left transition-colors",
+                      selected
+                        ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/30"
+                        : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-muted/40"
+                    )}
+                    aria-pressed={selected}
+                  >
+                    <span className="block text-sm font-semibold">{opt.label}</span>
+                    <span
+                      className={cn(
+                        "mt-0.5 block text-xs",
+                        selected ? "text-primary/80" : "text-muted-foreground"
+                      )}
+                    >
+                      {opt.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {fieldErrors.wearType ? (
+              <p className="mt-1.5 text-xs font-medium text-destructive">{fieldErrors.wearType}</p>
+            ) : null}
+          </div>
+
           <Input
             label="Slug"
             value={form.slug}
@@ -472,12 +567,54 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             leftIcon={<FiLink className="h-4 w-4" aria-hidden />}
             placeholder="aurora-wireless-headphones-pro"
           />
-          <Input
-            label="Brand"
-            value={form.brand}
-            onChange={(e) => set("brand", e.target.value)}
-            placeholder="e.g. Sonix, TechOne, or your own brand"
-          />
+          <div className="flex flex-col gap-1.5">
+            {brands.length === 0 && !brandsLoading ? (
+              <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
+                <p className="text-sm font-medium text-foreground">No brands yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Create a brand first, then choose it for your product.
+                </p>
+                <Button
+                  href="/admin/brands"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  leftIcon={<FiPlus className="h-4 w-4" aria-hidden />}
+                >
+                  Add brand
+                </Button>
+              </div>
+            ) : (
+              <Select
+                label="Brand"
+                value={form.brand}
+                onChange={(e) => set("brand", e.target.value)}
+                error={fieldErrors.brand}
+                hint={
+                  brandsLoading
+                    ? "Loading brands..."
+                    : `${brands.length} brand${brands.length === 1 ? "" : "s"} available`
+                }
+                leftIcon={<FiAward className="h-4 w-4" aria-hidden />}
+                disabled={brandsLoading || brands.length === 0}
+              >
+                <option value="" disabled>
+                  Select a brand
+                </option>
+                {!hasCurrentBrand && form.brand && (
+                  <option value={form.brand}>
+                    {form.brand} (current)
+                  </option>
+                )}
+                {brands.map((b) => (
+                  <option key={b._id} value={b.name}>
+                    {b.name}
+                    {b.isActive === false ? " (inactive)" : ""}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </div>
           <div className="flex flex-col gap-1.5">
             {categories.length === 0 && !categoriesLoading ? (
               <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">

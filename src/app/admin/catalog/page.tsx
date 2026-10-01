@@ -47,12 +47,27 @@ const links = [
 ];
 
 export default function AdminCatalogPage() {
-  const { data: productsData, isLoading: productsLoading } = useGetAdminProductsQuery({
-    limit: 1,
-    page: 1,
-  });
-  const { data: categoriesData, isLoading: categoriesLoading } = useGetAdminCategoriesQuery({});
-  const { data: brandsData, isLoading: brandsLoading } = useGetAdminBrandsQuery({});
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+  } = useGetAdminProductsQuery(
+    { limit: 1, page: 1 },
+    { refetchOnMountOrArgChange: true, pollingInterval: 15_000 }
+  );
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+  } = useGetAdminCategoriesQuery(
+    {},
+    { refetchOnMountOrArgChange: true, pollingInterval: 15_000 }
+  );
+  const {
+    data: brandsData,
+    isLoading: brandsLoading,
+  } = useGetAdminBrandsQuery(
+    {},
+    { refetchOnMountOrArgChange: true, pollingInterval: 15_000 }
+  );
 
   const productTotal = productsData?.total ?? 0;
   const categoryTotal = categoriesData?.total ?? categoriesData?.items?.length ?? 0;

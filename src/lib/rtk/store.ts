@@ -5,6 +5,7 @@ import cartReducer from "./cartSlice";
 import wishlistReducer from "./wishlistSlice";
 import compareReducer from "./compareSlice";
 import currencyReducer from "./currencySlice";
+import storeReducer from "./storeSlice";
 
 export const makeStore = () =>
   configureStore({
@@ -15,6 +16,7 @@ export const makeStore = () =>
       wishlist: wishlistReducer,
       compare: compareReducer,
       currency: currencyReducer,
+      store: storeReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(baseApi.middleware),

@@ -36,6 +36,7 @@ import {
 } from "react-icons/fi";
 import { Badge } from "@/components/ui/Badge";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
+import { AdminStoreSwitcher } from "@/components/admin/AdminStoreSwitcher";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { useLogout } from "@/hooks/use-logout";
 import { useTheme } from "@/hooks/use-theme";
@@ -45,6 +46,8 @@ import {
   useGetAdminNotificationsQuery,
   useGetAdminMessagesQuery,
 } from "@/lib/rtk/adminApi";
+import { useSelector } from "react-redux";
+import { selectStoreSlug } from "@/lib/rtk/storeSlice";
 
 function useClickOutside(
   refs: (React.RefObject<HTMLDivElement | null> | null)[],
@@ -119,6 +122,11 @@ export function AdminTopbar({
   const { data: user } = useGetMeQuery();
   const { logout } = useLogout();
   const { theme, toggleTheme } = useTheme();
+  const storeSlug = useSelector(selectStoreSlug);
+  const storefrontUrl =
+    storeSlug === "cosmetic"
+      ? process.env.NEXT_PUBLIC_COSMETIC_URL || "http://localhost:3001/catalog"
+      : "/shop";
 
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -177,16 +185,18 @@ export function AdminTopbar({
       <div className="hidden min-w-0 md:block">
         <p className="truncate text-sm font-bold text-foreground">{currentPage}</p>
         <Link
-          href="/shop"
+          href={storefrontUrl}
           target="_blank"
           className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary"
         >
           <FiExternalLink className="h-3 w-3" aria-hidden />
-          View catalog
+          View {storeSlug === "cosmetic" ? "Veya" : "NovaMart"} catalog
         </Link>
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <AdminStoreSwitcher />
+
         <div className="relative hidden lg:block" ref={searchRef}>
           <FiSearch
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"

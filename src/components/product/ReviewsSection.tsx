@@ -57,12 +57,12 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
   };
 
   return (
-    <div id="reviews" className="scroll-mt-28">
-      <div className="grid gap-10 lg:grid-cols-[300px_1fr]">
-        <div>
-          <h3 className="text-lg font-bold text-foreground">Customer reviews</h3>
-          <div className="mt-4 flex items-end gap-3">
-            <span className="text-5xl font-extrabold text-foreground">
+    <div id="reviews" className="scroll-mt-24">
+      <div className="grid grid-cols-1 gap-8 sm:gap-10 lg:grid-cols-[minmax(0,260px)_1fr] lg:gap-10">
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-foreground sm:text-lg">Customer reviews</h3>
+          <div className="mt-3 flex items-end gap-3 sm:mt-4">
+            <span className="text-4xl font-extrabold text-foreground sm:text-5xl">
               {breakdown.average.toFixed(1)}
             </span>
             <div className="pb-1.5">
@@ -101,11 +101,11 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
           </Button>
         </div>
 
-        <div>
+        <div className="min-w-0">
           {formOpen && (
             <form
               onSubmit={handleSubmit}
-              className="animate-fade-in-up mb-8 rounded-2xl border border-border bg-card p-6"
+              className="animate-fade-in-up mb-6 rounded-xl border border-border bg-card p-4 sm:mb-8 sm:rounded-2xl sm:p-6"
             >
               <h4 className="text-base font-bold text-foreground">
                 Share your experience
@@ -165,12 +165,12 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
             <ul className="divide-y divide-border">
               {reviews.map((review) => (
                 <li key={review.id} className="py-6 first:pt-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                  <div className="flex flex-wrap items-start gap-2 sm:items-center">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                       {review.name.charAt(0)}
                     </span>
-                    <div>
-                      <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-bold text-foreground">
                         {review.name}
                         {review.verified && (
                           <span className="flex items-center gap-0.5 text-xs font-medium text-success">
@@ -183,7 +183,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
                         {timeAgo(review.date)}
                       </span>
                     </div>
-                    <Rating value={review.rating} className="ml-auto" />
+                    <Rating value={review.rating} className="sm:ml-auto" />
                   </div>
                   <h5 className="mt-3 text-sm font-semibold text-foreground">
                     {review.title}

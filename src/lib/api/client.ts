@@ -1,4 +1,5 @@
 import { API_URL, API_TIMEOUT_MS } from "./config";
+import { DEFAULT_STORE_SLUG, getStoreSlug } from "../store/config";
 
 export type ApiEnvelope<T> = {
   success: boolean;
@@ -55,6 +56,7 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
       credentials: "include",
       headers: {
         Accept: "application/json",
+        "X-Store-Slug": isServer ? DEFAULT_STORE_SLUG : getStoreSlug(),
         ...(init.body && typeof init.body === "string" && !(init.headers instanceof Headers) && !init.headers
           ? { "Content-Type": "application/json" }
           : {}),

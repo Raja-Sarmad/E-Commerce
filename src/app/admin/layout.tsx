@@ -6,9 +6,12 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import { AdminFooter } from "@/components/admin/AdminFooter";
 import { Container } from "@/components/ui/Container";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { selectCurrencyCode } from "@/lib/rtk/currencySlice";
+import { selectStoreSlug, setStoreSlug } from "@/lib/rtk/storeSlice";
+import { baseApi } from "@/lib/rtk/baseApi";
+import type { AppDispatch } from "@/lib/rtk/store";
 import { cn } from "@/lib/utils";
 
 const ADMIN_ROLES = ["admin", "super_admin", "manager", "staff"];
@@ -19,6 +22,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const currency = useSelector(selectCurrencyCode);
+  const storeSlug = useSelector(selectStoreSlug);
+  const dispatch = useDispatch<AppDispatch>();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const store = params.get("store")?.trim().toLowerCase();
+    const nextStore = store === "cosmetic" || store === "ecommerce" ? store : "ecommerce";
+    dispatch(setStoreSlug(nextStore));
+    dispatch(baseApi.util.resetApiState());
+  }, [dispatch]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -63,7 +76,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           onToggleCollapse={() => setCollapsed((v) => !v)}
         />
         <main className="flex-1 p-4 lg:p-8">
-          <div key={currency} className="mx-auto w-full max-w-7xl">
+          <div key={`${currency}-${storeSlug}`} className="mx-auto w-full max-w-7xl">
             {children}
           </div>
         </main>

@@ -6,7 +6,11 @@ import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
 import { AuthShell, AuthFooter } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useDispatch } from "react-redux";
 import { useLoginMutation, useGetMeQuery } from "@/lib/rtk/authApi";
+import { baseApi } from "@/lib/rtk/baseApi";
+import { setStoreSlug } from "@/lib/rtk/storeSlice";
+import type { AppDispatch } from "@/lib/rtk/store";
 import { toast } from "@/hooks/use-toast";
 
 const demoCredentials = [
@@ -15,9 +19,16 @@ const demoCredentials = [
 ];
 
 export default function LoginPage() {
+  const dispatch = useDispatch<AppDispatch>();
   const [loginMutation, { isLoading: loginLoading }] = useLoginMutation();
   const { data: user } = useGetMeQuery();
   const router = useRouter();
+
+  const goAdminEcommerce = () => {
+    dispatch(setStoreSlug("ecommerce"));
+    dispatch(baseApi.util.resetApiState());
+    router.replace("/admin?store=ecommerce");
+  };
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,7 +39,7 @@ export default function LoginPage() {
     if (!user) return;
     const adminRoles = ["admin", "super_admin", "manager", "staff"];
     if (adminRoles.includes(user.role ?? "")) {
-      router.replace("/admin");
+      goAdminEcommerce();
     } else {
       router.replace("/account/profile");
     }
@@ -47,7 +58,9 @@ export default function LoginPage() {
       toast.success("Welcome back!", "You have signed in successfully.");
       const adminRoles = ["admin", "super_admin", "manager", "staff"];
       if (adminRoles.includes(user.role ?? "")) {
-        router.push("/admin");
+        dispatch(setStoreSlug("ecommerce"));
+        dispatch(baseApi.util.resetApiState());
+        router.push("/admin?store=ecommerce");
       } else {
         router.push("/account/profile");
       }

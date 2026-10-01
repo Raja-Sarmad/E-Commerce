@@ -63,15 +63,19 @@ export default function AdminCategoriesPage() {
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<CategoryForm>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set());
 
-  const { data, isLoading } = useGetAdminCategoriesQuery({});
+  const { data, isLoading, refetch } = useGetAdminCategoriesQuery({});
   const [createCategory] = useCreateCategoryMutation();
   const [updateCategory] = useUpdateCategoryMutation();
   const [deleteCategory] = useDeleteCategoryMutation();
 
   const items = useMemo(() => {
-    return (data?.items ?? []).map(toCategory);
-  }, [data]);
+    return (data?.items ?? [])
+      .map(toCategory)
+      .filter((c) => c.id && !removedIds.has(c.id));
+  }, [data, removedIds]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -176,17 +180,31 @@ export default function AdminCategoriesPage() {
       });
   };
 
-  const remove = () => {
-    if (!deleteTarget) return;
-    deleteCategory(deleteTarget.id)
-      .unwrap()
-      .then(() => {
-        toast.success("Category removed", `"${deleteTarget.name}" was deleted.`);
-        setDeleteTarget(null);
-      })
-      .catch(() => {
-        toast.warning("Error", "Failed to delete category.");
+  const remove = async () => {
+    if (!deleteTarget?.id) return;
+    const id = deleteTarget.id;
+    const name = deleteTarget.name;
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setDeleteTarget(null);
+    setDeleting(true);
+    try {
+      await deleteCategory(id).unwrap();
+      await refetch();
+      toast.success("Category removed", `"${name}" was deleted.`);
+    } catch {
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
       });
+      toast.warning("Error", "Failed to delete category.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handlePageSize = (size: number) => {
@@ -423,10 +441,13 @@ export default function AdminCategoriesPage() {
       <ConfirmDialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={remove}
+        onConfirm={() => {
+          void remove();
+        }}
         title="Delete category?"
         description={`This will permanently remove "${deleteTarget?.name}". Products in this category will not be deleted.`}
         confirmLabel="Delete"
+        loading={deleting}
       />
     </div>
   );

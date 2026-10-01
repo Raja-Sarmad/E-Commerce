@@ -25,16 +25,15 @@ export function ProductGallery({ images, name }: ProductGalleryProps) {
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-[380px] gap-3 sm:max-w-[420px] lg:mx-0 lg:max-w-none lg:gap-4",
-        "grid",
+        "grid w-full gap-3 sm:gap-4",
         hasMultiple && "lg:grid-cols-[64px_minmax(0,1fr)]"
       )}
     >
       {hasMultiple ? (
-        <div className="relative order-2 lg:order-1">
+        <div className="relative order-2 w-full lg:order-1">
           <div
             ref={thumbListRef}
-            className="flex gap-2 overflow-x-auto pb-1 no-scrollbar lg:max-h-[380px] lg:flex-col lg:overflow-y-auto lg:pb-0"
+            className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 no-scrollbar lg:max-h-[380px] lg:snap-none lg:flex-col lg:overflow-y-auto lg:pb-0"
           >
             {galleryImages.map((image, index) => (
               <button
@@ -44,18 +43,18 @@ export function ProductGallery({ images, name }: ProductGalleryProps) {
                 aria-label={`View image ${index + 1} of ${galleryImages.length}`}
                 aria-current={active === index}
                 className={cn(
-                  "relative shrink-0 overflow-hidden rounded-xl border-2 transition-all duration-200",
+                  "relative shrink-0 snap-start overflow-hidden rounded-lg border-2 transition-all duration-200 sm:rounded-xl",
                   active === index
                     ? "border-primary shadow-[0_0_0_1px_rgba(109,40,217,0.35)]"
                     : "border-border/60 opacity-70 hover:border-primary/40 hover:opacity-100"
                 )}
               >
-                <div className="relative h-14 w-14 lg:h-16 lg:w-16">
+                <div className="relative h-14 w-14 sm:h-16 sm:w-16 lg:h-16 lg:w-16">
                   <ProductImage
                     src={image}
                     alt={`${name} thumbnail ${index + 1}`}
                     fill
-                    sizes="84px"
+                    sizes="64px"
                     imgClassName="object-cover object-center"
                   />
                 </div>
@@ -77,7 +76,7 @@ export function ProductGallery({ images, name }: ProductGalleryProps) {
 
       <div
         className={cn(
-          "group relative order-1 overflow-hidden rounded-xl border border-border/70 bg-card shadow-md lg:order-2",
+          "group relative order-1 w-full overflow-hidden rounded-xl border border-border/70 bg-card shadow-md lg:order-2",
           zoomed && "cursor-zoom-out"
         )}
         onMouseMove={(e) => {
@@ -89,15 +88,19 @@ export function ProductGallery({ images, name }: ProductGalleryProps) {
           e.currentTarget.style.setProperty("--zoom-y", `${y}%`);
         }}
         onMouseLeave={() => setZoomed(false)}
-        onClick={() => setZoomed((prev) => !prev)}
+        onClick={() => {
+          if (window.matchMedia("(hover: hover)").matches) {
+            setZoomed((prev) => !prev);
+          }
+        }}
       >
-        <div className="relative aspect-[4/5] w-full overflow-hidden">
+        <div className="relative aspect-[4/5] max-h-[min(70vh,520px)] w-full overflow-hidden sm:max-h-[min(72vh,560px)] lg:max-h-none">
           <ProductImage
             src={galleryImages[active]}
             alt={name}
             priority
             fill
-            sizes="(max-width: 1024px) 100vw, 58vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 40vw"
             imgClassName={cn(
               "object-cover object-center transition-transform duration-500",
               zoomed &&
@@ -111,14 +114,16 @@ export function ProductGallery({ images, name }: ProductGalleryProps) {
           aria-label="Zoom image"
           onClick={(e) => {
             e.stopPropagation();
-            setZoomed((prev) => !prev);
+            if (window.matchMedia("(hover: hover)").matches) {
+              setZoomed((prev) => !prev);
+            }
           }}
-          className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-primary"
+          className="absolute right-2.5 bottom-2.5 hidden h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-primary sm:flex"
         >
           <FiZoomIn className="h-4 w-4" aria-hidden />
         </button>
         {hasMultiple ? (
-          <span className="absolute left-4 bottom-4 rounded-full bg-card/90 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm">
+          <span className="absolute left-2.5 bottom-2.5 rounded-full bg-card/90 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground backdrop-blur-sm sm:left-4 sm:bottom-4 sm:px-3 sm:py-1 sm:text-xs">
             {active + 1} / {galleryImages.length}
           </span>
         ) : null}

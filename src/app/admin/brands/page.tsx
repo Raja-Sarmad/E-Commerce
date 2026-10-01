@@ -36,9 +36,9 @@ const logoUrl = (seed: string) =>
 
 function toBrand(b: AdminBrand): Brand {
   return {
-    id: b._id,
+    id: String(b._id ?? (b as { id?: string }).id ?? ""),
     name: b.name,
-    logo: b.logo,
+    logo: b.logo || "",
   };
 }
 
@@ -50,15 +50,19 @@ export default function AdminBrandsPage() {
   const [editing, setEditing] = useState<Brand | null>(null);
   const [form, setForm] = useState<BrandForm>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Brand | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [removedIds, setRemovedIds] = useState<Set<string>>(() => new Set());
 
-  const { data, isLoading } = useGetAdminBrandsQuery({});
+  const { data, isLoading, refetch } = useGetAdminBrandsQuery({});
   const [createBrand] = useCreateBrandMutation();
   const [updateBrand] = useUpdateBrandMutation();
   const [deleteBrand] = useDeleteBrandMutation();
 
   const items = useMemo(() => {
-    return (data?.items ?? []).map(toBrand);
-  }, [data]);
+    return (data?.items ?? [])
+      .map(toBrand)
+      .filter((b) => b.id && !removedIds.has(b.id));
+  }, [data, removedIds]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -123,17 +127,38 @@ export default function AdminBrandsPage() {
     }
   };
 
-  const remove = () => {
-    if (!deleteTarget) return;
-    deleteBrand(deleteTarget.id)
-      .unwrap()
-      .then(() => {
-        toast.success("Brand removed", `"${deleteTarget.name}" was deleted.`);
-        setDeleteTarget(null);
-      })
-      .catch(() => {
-        toast.warning("Error", "Failed to delete brand.");
+  const remove = async () => {
+    if (!deleteTarget?.id) {
+      toast.warning("Error", "Brand id is missing. Refresh and try again.");
+      return;
+    }
+
+    const id = deleteTarget.id;
+    const name = deleteTarget.name;
+
+    // Instant UI removal — don't wait for refetch.
+    setRemovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setDeleteTarget(null);
+    setDeleting(true);
+
+    try {
+      await deleteBrand(id).unwrap();
+      await refetch();
+      toast.success("Brand removed", `"${name}" was deleted.`);
+    } catch {
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
       });
+      toast.warning("Error", "Failed to delete brand.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handlePageSize = (size: number) => {
@@ -293,10 +318,13 @@ export default function AdminBrandsPage() {
       <ConfirmDialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={remove}
+        onConfirm={() => {
+          void remove();
+        }}
         title="Delete brand?"
         description={`This will permanently remove "${deleteTarget?.name}". Products from this brand will not be deleted.`}
         confirmLabel="Delete"
+        loading={deleting}
       />
     </div>
   );

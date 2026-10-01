@@ -43,19 +43,19 @@ export function RelatedProductCard({ product }: RelatedProductCardProps) {
           />
         </div>
 
-        <div className="flex items-end justify-between gap-3 px-3.5 py-3 sm:px-4 sm:py-3.5">
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-semibold text-foreground sm:text-[15px]">
+        <div className="flex items-end justify-between gap-2 px-2.5 py-2.5 sm:gap-3 sm:px-4 sm:py-3.5">
+          <div className="min-w-0 flex-1">
+            <h3 className="line-clamp-2 text-xs font-semibold leading-snug text-foreground sm:text-sm">
               {product.name}
             </h3>
-            <p className="mt-0.5 text-sm text-muted-foreground">{formatPrice(product.price)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{formatPrice(product.price)}</p>
           </div>
           <button
             type="button"
             onClick={handleWishlist}
             aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
             className={cn(
-              "mb-0.5 shrink-0 p-1 transition-colors",
+              "mb-0.5 shrink-0 p-1.5 transition-colors sm:p-1",
               wishlisted
                 ? "text-destructive"
                 : "text-muted-foreground hover:text-primary"

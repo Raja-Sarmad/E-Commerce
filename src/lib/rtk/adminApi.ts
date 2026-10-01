@@ -108,8 +108,15 @@ function toItemList<T>(raw: unknown): ListResponse<T> {
   return parseListResponse<T>(raw);
 }
 
+export type AdminStore = { _id: string; slug: string; name: string; isActive: boolean };
+
 export const adminApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getStores: builder.query<AdminStore[], void>({
+      query: () => ({ url: "/stores" }),
+      transformResponse: (raw: unknown) => (raw as AdminStore[]) ?? [],
+      providesTags: ["Stores"],
+    }),
     /* ── Analytics / Dashboard ─────────────────────────────────── */
     getDashboardOverview: builder.query<AdminOverview, void>({
       query: () => ({ url: "/analytics/overview" }),
@@ -163,13 +170,16 @@ export const adminApi = baseApi.injectEndpoints({
     /* ── Products ──────────────────────────────────────────────── */
     getAdminProducts: builder.query<ListResponse<Product>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/products/admin/list${buildQs(params)}` }),
-      transformResponse: (raw: unknown) => {
-        const data = (raw as { data?: unknown })?.data ?? raw;
-        const items = (Array.isArray(data) ? data : []).map((p) => {
-          const { _id, ...rest } = p as Record<string, unknown>;
-          return { ...rest, id: String(_id ?? ""), position: (rest as Record<string, unknown>).position ?? 0 } as unknown as Product;
-        });
-        return { items, total: items.length, page: 1, totalPages: 1 };
+      transformResponse: (raw: unknown, meta) => {
+        const parsed = parseListResponse<Record<string, unknown>>(raw, meta, true);
+        return {
+          ...parsed,
+          items: parsed.items.map((p) => ({
+            ...p,
+            id: String(p.id ?? ""),
+            position: (p as { position?: number }).position ?? 0,
+          })) as unknown as Product[],
+        };
       },
       providesTags: ["Products"],
     }),
@@ -252,12 +262,27 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     deleteCategory: builder.mutation<unknown, string>({
       query: (id) => ({ url: `/categories/${id}`, method: "DELETE" }),
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const patches = dispatch(
+          adminApi.util.updateQueryData("getAdminCategories", {}, (draft) => {
+            draft.items = draft.items.filter(
+              (c) => String(c._id ?? (c as { id?: string }).id ?? "") !== String(id)
+            );
+            draft.total = draft.items.length;
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.undo();
+        }
+      },
       invalidatesTags: ["Categories", "Dashboard"],
     }),
 
     /* ── Brands ────────────────────────────────────────────────── */
     getAdminBrands: builder.query<ListResponse<AdminBrand>, Record<string, string | number | undefined>>({
-      query: (params) => ({ url: `/brands${buildQs(params)}` }),
+      query: (params) => ({ url: `/brands/admin/list${buildQs(params)}` }),
       transformResponse: (raw: unknown) => {
         const data = (raw as { data?: unknown })?.data ?? raw;
         const items = (Array.isArray(data) ? data : []) as AdminBrand[];
@@ -267,7 +292,7 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     createBrand: builder.mutation<AdminBrand, Partial<AdminBrand>>({
       query: (body) => ({ url: "/brands", method: "POST", body }),
-      invalidatesTags: ["Brands"],
+      invalidatesTags: ["Brands", "Dashboard"],
     }),
     updateBrand: builder.mutation<AdminBrand, { id: string; body: Partial<AdminBrand> }>({
       query: ({ id, body }) => ({ url: `/brands/${id}`, method: "PATCH", body }),
@@ -275,7 +300,22 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     deleteBrand: builder.mutation<unknown, string>({
       query: (id) => ({ url: `/brands/${id}`, method: "DELETE" }),
-      invalidatesTags: ["Brands"],
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const patches = dispatch(
+          adminApi.util.updateQueryData("getAdminBrands", {}, (draft) => {
+            draft.items = draft.items.filter(
+              (b) => String(b._id ?? (b as { id?: string }).id ?? "") !== String(id)
+            );
+            draft.total = draft.items.length;
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.undo();
+        }
+      },
+      invalidatesTags: ["Brands", "Dashboard"],
     }),
 
     /* ── Banners ───────────────────────────────────────────────── */
@@ -462,10 +502,11 @@ export const adminApi = baseApi.injectEndpoints({
     getAdminCoupons: builder.query<ListResponse<AdminCoupon>, Record<string, string | number | undefined>>({
       query: (params) => ({ url: `/coupons${buildQs(params)}` }),
       transformResponse: (raw: unknown) => parseListResponse<AdminCoupon>(raw),
+      providesTags: ["Coupons"],
     }),
     createCoupon: builder.mutation<AdminCoupon, Partial<AdminCoupon>>({
       query: (body) => ({ url: "/coupons", method: "POST", body }),
-      invalidatesTags: ["Coupons"],
+      invalidatesTags: ["Coupons", "Dashboard"],
     }),
     updateCoupon: builder.mutation<AdminCoupon, { id: string; body: Partial<AdminCoupon> }>({
       query: ({ id, body }) => ({ url: `/coupons/${id}`, method: "PATCH", body }),
@@ -473,7 +514,20 @@ export const adminApi = baseApi.injectEndpoints({
     }),
     deleteCoupon: builder.mutation<unknown, string>({
       query: (id) => ({ url: `/coupons/${id}`, method: "DELETE" }),
-      invalidatesTags: ["Coupons"],
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const patches = dispatch(
+          adminApi.util.updateQueryData("getAdminCoupons", {}, (draft) => {
+            draft.items = draft.items.filter((c) => String(c._id) !== String(id));
+            draft.total = draft.items.length;
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.undo();
+        }
+      },
+      invalidatesTags: ["Coupons", "Dashboard"],
     }),
 
     /* ── Shipping ──────────────────────────────────────────────── */
@@ -673,6 +727,7 @@ export const adminApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useGetStoresQuery,
   // Analytics / Dashboard
   useGetDashboardOverviewQuery,
   useGetRevenueSeriesQuery,

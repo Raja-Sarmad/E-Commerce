@@ -33,7 +33,9 @@ import {
   FiX,
 } from "react-icons/fi";
 import { Badge } from "@/components/ui/Badge";
+import { useSelector } from "react-redux";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
+import { selectStoreLabel, selectStoreSlug } from "@/lib/rtk/storeSlice";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -134,6 +136,11 @@ function SidebarContent({
 }) {
   const pathname = usePathname();
   const { data: user } = useGetMeQuery();
+  const storeSlug = useSelector(selectStoreSlug);
+  const storeLabel = useSelector(selectStoreLabel);
+  const isVeya = storeSlug === "cosmetic";
+  const brandInitial = isVeya ? "V" : "N";
+  const brandName = isVeya ? "Veya" : "NovaMart";
 
   return (
     <div className="flex h-full flex-col">
@@ -143,15 +150,20 @@ function SidebarContent({
           collapsed && "justify-center px-0"
         )}
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary font-extrabold text-primary-foreground">
-          N
+        <span
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-primary-foreground",
+            isVeya ? "bg-emerald-700" : "bg-primary"
+          )}
+        >
+          {brandInitial}
         </span>
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-sm font-extrabold tracking-tight text-foreground">
-              NovaMart
+              {brandName}
             </p>
-            <p className="truncate text-xs text-muted-foreground">Admin panel</p>
+            <p className="truncate text-xs text-muted-foreground">{storeLabel}</p>
           </div>
         )}
       </div>

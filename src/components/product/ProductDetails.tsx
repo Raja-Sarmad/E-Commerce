@@ -173,8 +173,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   };
 
   return (
-    <div className="flex flex-col lg:sticky lg:top-24 lg:self-start">
-      <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium tracking-[0.14em] text-primary uppercase">
+    <div className="flex w-full min-w-0 flex-col lg:sticky lg:top-24 lg:self-start">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-medium tracking-[0.12em] text-primary uppercase sm:text-[11px] sm:tracking-[0.14em]">
         <Link href={`/shop?category=${product.categorySlug}`} className="hover:underline">
           {product.category}
         </Link>
@@ -192,7 +192,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         </span>
       ) : null}
 
-      <h1 className="font-display mt-2 text-2xl leading-tight font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="font-display mt-2 break-words text-xl leading-tight font-semibold tracking-tight text-foreground sm:text-2xl lg:text-3xl">
         {product.name}
       </h1>
 
@@ -203,8 +203,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:gap-x-3">
+        <span className="text-xl font-bold tracking-tight text-foreground sm:text-2xl lg:text-3xl">
           {formatPrice(product.price)}
         </span>
         {product.compareAtPrice && product.compareAtPrice > product.price ? (
@@ -297,12 +297,12 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
       {!isAdmin ? (
         <div className="mt-6 space-y-2.5">
-          <div className="flex gap-2.5">
+          <div className="flex gap-2 sm:gap-2.5">
             <Button
               onClick={() => handleAddToCart()}
               size="md"
               disabled={outOfStock}
-              className="h-11 flex-1 rounded-lg text-sm font-semibold"
+              className="h-11 min-h-[44px] flex-1 rounded-lg text-sm font-semibold"
             >
               {added ? (
                 <>
@@ -324,7 +324,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               onClick={handleWishlist}
               aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
               className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-all",
+                "flex h-11 min-h-[44px] w-11 min-w-[44px] shrink-0 items-center justify-center rounded-lg border transition-all",
                 wishlisted
                   ? "border-destructive/50 bg-destructive/10 text-destructive"
                   : "border-border bg-card text-foreground hover:border-primary/40 hover:text-primary"
@@ -345,25 +345,34 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         </div>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-3 gap-2 border-t border-border/70 pt-5">
+      <div className="mt-5 grid grid-cols-3 gap-1.5 border-t border-border/70 pt-4 sm:gap-2 sm:pt-5">
         {[
           {
             icon: FiTruck,
             title: "Free Shipping",
+            shortTitle: "Shipping",
             text: `Over ${formatPrice(siteConfig.freeShippingThreshold)}`,
           },
-          { icon: FiRefreshCw, title: "Easy Returns", text: "30-day returns" },
-          { icon: FiShield, title: "Secure Payment", text: "SSL encrypted" },
+          {
+            icon: FiRefreshCw,
+            title: "Easy Returns",
+            shortTitle: "Returns",
+            text: "30-day returns",
+          },
+          {
+            icon: FiShield,
+            title: "Secure Payment",
+            shortTitle: "Secure",
+            text: "SSL encrypted",
+          },
         ].map((item) => (
-          <div
-            key={item.title}
-            className="py-1 text-center"
-          >
-            <span className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <item.icon className="h-3.5 w-3.5" aria-hidden />
+          <div key={item.title} className="py-1 text-center">
+            <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary sm:h-8 sm:w-8">
+              <item.icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden />
             </span>
-            <p className="mt-1.5 text-[11px] font-semibold text-foreground">{item.title}</p>
-            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{item.text}</p>
+            <p className="mt-1 text-[10px] font-semibold text-foreground sm:hidden">{item.shortTitle}</p>
+            <p className="mt-1.5 hidden text-[11px] font-semibold text-foreground sm:block">{item.title}</p>
+            <p className="mt-0.5 hidden text-[10px] leading-snug text-muted-foreground sm:block">{item.text}</p>
           </div>
         ))}
       </div>
@@ -375,9 +384,9 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           aria-modal="true"
           aria-labelledby="size-guide-title"
         >
-          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-2xl sm:p-6">
             <div className="flex items-start justify-between gap-4">
-              <h2 id="size-guide-title" className="font-display text-2xl font-semibold text-foreground">
+              <h2 id="size-guide-title" className="font-display text-xl font-semibold text-foreground sm:text-2xl">
                 Size Guide
               </h2>
               <button

@@ -54,19 +54,19 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const { related } = product;
 
   return (
-    <div className="bg-background">
-      <section className="bg-secondary px-5 pt-6 pb-10 sm:px-8 sm:pt-8 sm:pb-12 lg:px-12">
-        <div className="mx-auto max-w-6xl">
+    <div className="overflow-x-hidden bg-background">
+      <section className="bg-secondary px-4 pt-5 pb-8 sm:px-6 sm:pt-7 sm:pb-10 lg:px-8 lg:pb-12">
+        <div className="mx-auto w-full max-w-6xl">
           <Link
             href="/#catalog"
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-primary sm:gap-2 sm:text-sm"
           >
-            <FiArrowLeft className="h-4 w-4" aria-hidden />
+            <FiArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
             Back to catalog
           </Link>
 
-          <div className="mt-4 overflow-hidden rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:p-6 lg:p-7">
-            <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
+          <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card p-3 shadow-sm sm:mt-4 sm:rounded-2xl sm:p-5 lg:p-7">
+            <div className="grid grid-cols-1 items-start gap-5 sm:gap-6 lg:grid-cols-2 lg:gap-8">
               <ProductGallery images={product.images} name={product.name} />
               <ProductDetails product={product} />
             </div>
@@ -78,27 +78,27 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       {related.length > 0 ? (
         <section
-          className="border-t border-border/70 bg-background px-5 py-10 sm:px-8 sm:py-12 lg:px-12"
+          className="border-t border-border/70 bg-background px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
           aria-labelledby="related-heading"
         >
-          <div className="mx-auto max-w-6xl">
-            <div className="flex items-center justify-between gap-4">
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="flex items-center justify-between gap-3">
               <h2
                 id="related-heading"
-                className="text-xl font-bold tracking-tight text-foreground sm:text-2xl"
+                className="text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl"
               >
                 You May Also Like
               </h2>
               <Link
                 href={`/shop?category=${product.categorySlug}`}
-                className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary sm:text-sm"
               >
                 View All
-                <FiArrowRight className="h-4 w-4" aria-hidden />
+                <FiArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
               </Link>
             </div>
             <LiveStockProvider productIds={related.map((p) => p.id)}>
-              <div className="mt-6 grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-4">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:gap-4 md:grid-cols-4 md:gap-5">
                 {related.slice(0, 4).map((item) => (
                   <RelatedProductCard key={item.id} product={item} />
                 ))}

@@ -13,6 +13,7 @@ export function CartOwnerSync() {
   const cartOwnerId = useSelector((state: RootState) => state.cart.ownerId);
   const cartItems = useSelector((state: RootState) => state.cart.items.length);
   const { data: user, isFetching } = useGetMeQuery();
+  
 
   useEffect(() => {
     if (isFetching) return;

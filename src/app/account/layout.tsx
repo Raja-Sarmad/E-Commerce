@@ -15,6 +15,7 @@ import { useLogout } from "@/hooks/use-logout";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/hooks/use-mounted";
 
 const links = [
   { label: "Profile", href: "/account/profile", icon: FiUser },
@@ -24,16 +25,17 @@ const links = [
 ];
 
 export default function AccountLayout({ children }: { children: ReactNode }) {
+  const mounted = useMounted();
   const { data: user, isLoading } = useGetMeQuery();
   const { logout } = useLogout();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) router.replace("/login");
-  }, [user, isLoading, router]);
+    if (mounted && !isLoading && !user) router.replace("/login");
+  }, [mounted, user, isLoading, router]);
 
-  if (!user) {
+  if (!mounted || !user) {
     return (
       <Container className="py-20 text-center text-muted-foreground">
         Loading your account...

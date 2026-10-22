@@ -470,7 +470,12 @@ export function DonutChart({
   );
   const radius = (size - thickness) / 2;
   const circumference = 2 * Math.PI * radius;
-  let acc = 0;
+  const slicesWithOffsets = slices.map((slice, idx) => {
+    const preceding = slices
+      .slice(0, idx)
+      .reduce((sum, item) => sum + item.value / total, 0);
+    return { slice, offset: preceding * circumference };
+  });
 
   return (
     <div className={cn("flex flex-col items-center gap-6 sm:flex-row", className)}>
@@ -489,11 +494,9 @@ export function DonutChart({
             stroke="var(--color-muted)"
             strokeWidth={thickness}
           />
-            {slices.map((slice, idx) => {
+            {slicesWithOffsets.map(({ slice, offset }, idx) => {
             const frac = slice.value / total;
             const dash = frac * circumference;
-            const offset = acc * circumference;
-            acc += frac;
             return (
               <circle
                 key={slice.label}

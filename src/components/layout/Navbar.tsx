@@ -27,6 +27,8 @@ export function Navbar() {
   const [query, setQuery] = useState("");
 
   useEffect(() => {
+    // Close any open cart drawer after navigation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCartOpen(false);
   }, [pathname]);
 

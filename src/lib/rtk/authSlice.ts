@@ -57,6 +57,24 @@ const authSlice = createSlice({
     },
     hydrateAccessToken: (state) => {
       if (typeof window === "undefined") return;
+
+      // Cross-app handoff from Overdose Store login: #access_token=...
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      if (hash) {
+        const params = new URLSearchParams(hash);
+        const fromHash = params.get("access_token");
+        if (fromHash) {
+          sessionStorage.setItem(ACCESS_TOKEN_KEY, fromHash);
+          state.accessToken = fromHash;
+          const clean =
+            window.location.pathname + window.location.search;
+          window.history.replaceState(null, "", clean);
+          return;
+        }
+      }
+
       state.accessToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
     },
     setHydrated: (state) => {

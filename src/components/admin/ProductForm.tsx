@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, type ReactNode } from "react";
+import { useRef, useState, useEffect, useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import {
@@ -25,12 +25,12 @@ import {
   useUpdateProductMutation,
   useGetAdminCategoriesQuery,
   useGetAdminBrandsQuery,
+  useCreateCategoryMutation,
 } from "@/lib/rtk/adminApi";
 import { getErrorMessage } from "@/lib/rtk/baseApi";
 import { uploadFileToCloudinary } from "@/lib/cloudinary-upload";
 import { slugify, sanitizePositiveDecimal, sanitizeWholeNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { useFormatPrice } from "@/hooks/use-format-price";
 import { selectCurrencyMeta } from "@/lib/rtk/currencySlice";
 import { selectStoreLabel, selectStoreSlug } from "@/lib/rtk/storeSlice";
 import type { Product, ProductVariant } from "@/lib/types";
@@ -160,6 +160,7 @@ const emptyForm = {
   brand: "",
   category: "",
   categorySlug: "",
+  gender: "" as "" | "men" | "women" | "unisex",
   wearType: "" as "" | "stitched" | "unstitched" | "modelwear",
   description: "",
   materials: "",
@@ -182,18 +183,19 @@ const emptyForm = {
 };
 
 export function ProductForm({ initial, mode }: ProductFormProps) {
-  const formatPrice = useFormatPrice();
   const currencyMeta = useSelector(selectCurrencyMeta);
   const storeLabel = useSelector(selectStoreLabel);
   const storeSlug = useSelector(selectStoreSlug);
   const router = useRouter();
   const { data: categoryData, isLoading: categoriesLoading } = useGetAdminCategoriesQuery({});
-  const categories = categoryData?.items ?? [];
+  const categories = useMemo(() => categoryData?.items ?? [], [categoryData]);
   const { data: brandData, isLoading: brandsLoading } = useGetAdminBrandsQuery({});
-  const brands = brandData?.items ?? [];
+  const brands = useMemo(() => brandData?.items ?? [], [brandData]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [createProduct] = useCreateProductMutation();
   const [updateProduct] = useUpdateProductMutation();
+  const [createCategory, { isLoading: creatingCategory }] = useCreateCategoryMutation();
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   // Convert USD (database) → active currency for display in input
   const usdToActive = (usd: number) => {
@@ -231,6 +233,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
           brand: initial.brand,
           category: initial.category,
           categorySlug: initial.categorySlug,
+          gender: initial.gender || "",
           wearType: (initial.wearType as typeof emptyForm.wearType) || "",
           description: initial.description,
           materials: initial.materials ?? "",
@@ -293,6 +296,8 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
 
   useEffect(() => {
     if (mode !== "create" || initial || categories.length === 0) return;
+    // Default the create form once async category options are available.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm((prev) => {
       if (prev.categorySlug) return prev;
       const first = categories[0];
@@ -306,6 +311,8 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
 
   useEffect(() => {
     if (mode !== "create" || initial || brands.length === 0) return;
+    // Default the create form once async brand options are available.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm((prev) => {
       if (prev.brand.trim()) return prev;
       return { ...prev, brand: brands[0].name };
@@ -333,6 +340,23 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     set("categorySlug", cat.slug);
   };
 
+  const addCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      toast.error("Category name required", "Enter a name for your category.");
+      return;
+    }
+    try {
+      const category = await createCategory({ name, isActive: true }).unwrap();
+      set("category", category.name);
+      set("categorySlug", category.slug);
+      setNewCategoryName("");
+      toast.success("Category created", `"${category.name}" is selected for this product.`);
+    } catch (err) {
+      toast.error("Could not create category", getErrorMessage(err));
+    }
+  };
+
   const hasCurrentCategory =
     !form.categorySlug ||
     categories.some((c) => c.slug === form.categorySlug);
@@ -343,8 +367,10 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
 
   const validate = () => {
     const errors: Record<string, string> = {};
+    if (!form.name.trim()) errors.name = "Product name is required.";
     if (!form.brand.trim()) errors.brand = "Select a brand.";
     if (!form.category.trim()) errors.category = "Select a category.";
+    if (storeSlug === "store" && !form.gender) errors.gender = "Choose who this product is for.";
     if (!form.wearType) errors.wearType = "Select stitched, unstitched, or model wear.";
     if (!form.price.trim() || Number(form.price) <= 0)
       errors.price = "Enter a valid price greater than 0.";
@@ -377,6 +403,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     formData.append("brand", form.brand);
     formData.append("category", form.category);
     formData.append("categorySlug", form.categorySlug);
+    if (form.gender) formData.append("gender", form.gender);
     formData.append("wearType", form.wearType);
     formData.append("description", form.description.trim());
     formData.append("materials", form.materials.trim());
@@ -442,7 +469,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         mode === "edit" ? "Product updated" : "Product created",
         `"${form.name.trim()}" was ${mode === "edit" ? "updated" : "added to your catalog"}.`
       );
-      router.push("/admin/products");
+      router.push(`/admin/products?store=${storeSlug}`);
     } catch (err) {
       setSaving(false);
       setUploadingImages(false);
@@ -507,8 +534,22 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         <strong>{storeLabel}</strong>
         {storeSlug === "cosmetic"
           ? " — visible on the Veya cosmetic site only."
+          : storeSlug === "store"
+          ? " — visible on the Sab Pehno store only."
+          : storeSlug === "warqu"
+          ? " — visible on the Warqu site only."
           : " — visible on the NovaMart e-commerce site only."}
       </div>
+      {Object.keys(fieldErrors).length > 0 && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p className="font-semibold">Please complete these fields:</p>
+          <ul className="mt-1 list-inside list-disc">
+            {Object.entries(fieldErrors).map(([field, message]) => (
+              <li key={field}>{message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <SectionCard title="General" description="Core product information shown to customers.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
@@ -567,6 +608,20 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             leftIcon={<FiLink className="h-4 w-4" aria-hidden />}
             placeholder="aurora-wireless-headphones-pro"
           />
+          {storeSlug === "store" && (
+            <Select
+              label="Shop section"
+              value={form.gender}
+              onChange={(e) => set("gender", e.target.value as typeof form.gender)}
+              error={fieldErrors.gender}
+              hint="This decides whether the product appears in Men, Women, or both."
+            >
+              <option value="">Choose a section</option>
+              <option value="men">Men</option>
+              <option value="women">Women</option>
+              <option value="unisex">Unisex (Men & Women)</option>
+            </Select>
+          )}
           <div className="flex flex-col gap-1.5">
             {brands.length === 0 && !brandsLoading ? (
               <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
@@ -620,16 +675,25 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
               <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
                 <p className="text-sm font-medium text-foreground">No categories yet</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Create a category first, then assign your product to it.
+                  Create your first category here without leaving this product.
                 </p>
+                <Input
+                  name="newCategoryName"
+                  label="New category name"
+                  placeholder="e.g. T-Shirts"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  containerClassName="mt-3"
+                />
                 <Button
-                  href="/admin/categories"
+                  onClick={addCategory}
+                  loading={creatingCategory}
                   variant="outline"
                   size="sm"
                   className="mt-3"
                   leftIcon={<FiPlus className="h-4 w-4" aria-hidden />}
                 >
-                  Add category
+                  Create category
                 </Button>
               </div>
             ) : (
@@ -998,6 +1062,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             value={form.tags}
             onChange={(next) => set("tags", next)}
             placeholder="Add a tag"
+            hint="For the Store premium page, add the exact tag Premium. New arrival controls the New Arrival page; Best seller highlights a product on the Store homepage. A compare-at price above the selling price places it in Sales."
           />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {(
@@ -1044,7 +1109,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button
           variant="outline"
-          onClick={() => router.push("/admin/products")}
+          onClick={() => router.push(`/admin/products?store=${storeSlug}`)}
           leftIcon={<FiX className="h-4 w-4" aria-hidden />}
         >
           Cancel

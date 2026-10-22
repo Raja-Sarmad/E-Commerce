@@ -47,7 +47,7 @@ import {
   useGetAdminMessagesQuery,
 } from "@/lib/rtk/adminApi";
 import { useSelector } from "react-redux";
-import { selectStoreSlug } from "@/lib/rtk/storeSlice";
+import { selectStoreLabel, selectStoreSlug } from "@/lib/rtk/storeSlice";
 
 function useClickOutside(
   refs: (React.RefObject<HTMLDivElement | null> | null)[],
@@ -70,7 +70,7 @@ function Popover({
   trigger,
   open,
   onToggle,
-  refs,
+  containerRef,
   align = "right",
   width = "w-80",
   children,
@@ -78,13 +78,13 @@ function Popover({
   trigger: ReactNode;
   open: boolean;
   onToggle: () => void;
-  refs: (React.RefObject<HTMLDivElement | null> | null)[];
+  containerRef: React.RefObject<HTMLDivElement | null>;
   align?: "left" | "right";
   width?: string;
   children: ReactNode;
 }) {
   return (
-    <div className="relative" ref={refs[0]}>
+    <div className="relative" ref={containerRef}>
       {trigger}
       {open && (
         <div
@@ -123,10 +123,15 @@ export function AdminTopbar({
   const { logout } = useLogout();
   const { theme, toggleTheme } = useTheme();
   const storeSlug = useSelector(selectStoreSlug);
+  const storeLabel = useSelector(selectStoreLabel);
   const storefrontUrl =
     storeSlug === "cosmetic"
       ? process.env.NEXT_PUBLIC_COSMETIC_URL || "http://localhost:3001/catalog"
-      : "/shop";
+      : storeSlug === "store"
+        ? process.env.NEXT_PUBLIC_OVERDOSE_URL || "http://localhost:3000"
+        : storeSlug === "warqu"
+          ? process.env.NEXT_PUBLIC_WARQU_URL || "http://localhost:3002"
+          : "/shop";
 
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -190,7 +195,7 @@ export function AdminTopbar({
           className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary"
         >
           <FiExternalLink className="h-3 w-3" aria-hidden />
-          View {storeSlug === "cosmetic" ? "Veya" : "NovaMart"} catalog
+          View {storeLabel} catalog
         </Link>
       </div>
 
@@ -257,7 +262,7 @@ export function AdminTopbar({
         <Popover
           open={quickOpen}
           onToggle={() => setQuickOpen((v) => !v)}
-          refs={[quickRef]}
+          containerRef={quickRef}
           width="w-56"
           trigger={
             <button
@@ -321,7 +326,7 @@ export function AdminTopbar({
         <Popover
           open={notifOpen}
           onToggle={() => setNotifOpen((v) => !v)}
-          refs={[notifRef]}
+          containerRef={notifRef}
           trigger={
             <button
               type="button"
@@ -406,7 +411,7 @@ export function AdminTopbar({
         <Popover
           open={msgOpen}
           onToggle={() => setMsgOpen((v) => !v)}
-          refs={[msgRef]}
+          containerRef={msgRef}
           trigger={
             <button
               type="button"
@@ -477,7 +482,7 @@ export function AdminTopbar({
         <Popover
           open={profileOpen}
           onToggle={() => setProfileOpen((v) => !v)}
-          refs={[profileRef]}
+          containerRef={profileRef}
           width="w-64"
           trigger={
             <button

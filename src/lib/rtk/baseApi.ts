@@ -26,6 +26,10 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
+// Share a refresh only within the same Redux store. Concurrent 401 responses
+// must not rotate the refresh cookie independently.
+const pendingRefreshes = new WeakMap<object, Promise<void>>();
+
 const unwrapResponse = (result: { data?: ApiEnvelope | unknown }, meta?: unknown) => {
   const envelope = result.data as ApiEnvelope | undefined;
   if (envelope && typeof envelope === "object" && "success" in envelope) {
@@ -54,22 +58,42 @@ export const baseQueryWithReauth: BaseQueryFn<
   Record<string, unknown>,
   FetchBaseQueryMeta
 > = async (args, api, extraOptions) => {
+  const getToken = () => (api.getState() as RootState).auth.accessToken;
+  const requestToken = getToken();
   let result = await rawBaseQuery(args, api, extraOptions);
   let error = result.error as FetchBaseQueryError | undefined;
 
-  if (error && error.status === 401) {
-    const refreshResult = await rawBaseQuery(
-      { url: "/auth/refresh-token", method: "POST" },
-      api,
-      extraOptions
-    );
+  const requestUrl = typeof args === "string" ? args : args.url;
+  const isAuthRequest = requestUrl.startsWith("/auth/") && requestUrl !== "/auth/logout";
 
-    if (refreshResult.data) {
-      storeAccessTokenFromResult(api, refreshResult);
+  if (error && error.status === 401 && !isAuthRequest) {
+    if (getToken() === requestToken) {
+      let refresh = pendingRefreshes.get(api.dispatch);
+      if (!refresh) {
+        refresh = (async () => {
+          const refreshToken = getToken();
+          const refreshResult = await rawBaseQuery(
+            { url: "/auth/refresh-token", method: "POST" },
+            api,
+            extraOptions
+          );
+          // A login or logout completed while this request was in flight.
+          // Its session takes precedence over this older refresh response.
+          if (getToken() !== refreshToken) return;
+          if (refreshResult.data) {
+            storeAccessTokenFromResult(api, refreshResult);
+          } else if (refreshResult.error?.status === 401 || refreshResult.error?.status === 403) {
+            api.dispatch(clearAuthCookies());
+          }
+        })().finally(() => pendingRefreshes.delete(api.dispatch));
+        pendingRefreshes.set(api.dispatch, refresh);
+      }
+      await refresh;
+    }
+
+    if (getToken()) {
       result = await rawBaseQuery(args, api, extraOptions);
       error = result.error as FetchBaseQueryError | undefined;
-    } else {
-      api.dispatch(clearAuthCookies());
     }
   }
 
@@ -94,6 +118,7 @@ export const baseApi = createApi({
 });
 
 export function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
   if (err && typeof err === "object" && "data" in err) {
     const data = (err as {
       data?: {
@@ -111,12 +136,12 @@ export function getErrorMessage(err: unknown): string {
     if (data?.message) return data.message;
   }
   if (err && typeof err === "object" && "status" in err) {
-    const e = err as { status: number; data?: { message?: string } };
+    const e = err as { status: number | string; data?: { message?: string } };
     if (e.status === 401) return "Your session has expired. Please log in again.";
     if (e.status === 403) return "You do not have permission to perform this action.";
     if (e.status === 404) return "The requested resource was not found.";
-    if (e.status === 408) return "The request timed out. Please try again.";
-    if (e.status === 0) return "Network error — could not reach the server.";
+    if (e.status === 408 || e.status === "TIMEOUT_ERROR") return "The request timed out. Please try again.";
+    if (e.status === 0 || e.status === "FETCH_ERROR") return "Network error — could not reach the server. Please check your connection and try again.";
     if (e.data?.message) return e.data.message;
   }
   return "Something went wrong. Please try again.";

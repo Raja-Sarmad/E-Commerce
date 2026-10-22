@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Provider, useDispatch } from "react-redux";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { makeStore, type AppStore, type AppDispatch } from "@/lib/rtk/store";
+import { makeStore, type AppDispatch } from "@/lib/rtk/store";
 import { queryClient } from "@/lib/tanstack/queryClient";
 import dynamic from "next/dynamic";
 import { hydrateCart } from "@/lib/rtk/cartSlice";
@@ -20,6 +20,8 @@ import { CartOwnerSync } from "@/components/cart/CartOwnerSync";
 function HydrateClientState() {
   const dispatch = useDispatch<AppDispatch>();
   useEffect(() => {
+    dispatch(hydrateAccessToken());
+    dispatch(hydrateCart());
     dispatch(hydrateWishlist());
     dispatch(hydrateCompare());
     dispatch(hydrateCurrency());
@@ -27,24 +29,17 @@ function HydrateClientState() {
   return null;
 }
 
-function createStore() {
-  const store = makeStore();
-  bindCurrencyStore(store);
-  if (typeof window !== "undefined") {
-    store.dispatch(hydrateAccessToken());
-    store.dispatch(hydrateCart());
-  }
-  return store;
+const store = makeStore();
+bindCurrencyStore(store);
+
+// Sync before first paint so Store→admin #access_token handoff is available to getMe.
+if (typeof window !== "undefined") {
+  store.dispatch(hydrateAccessToken());
 }
 
 export function Providers({ children }: { children: ReactNode }) {
-  const storeRef = useRef<AppStore | null>(null);
-  if (!storeRef.current) {
-    storeRef.current = createStore();
-  }
-
   return (
-    <Provider store={storeRef.current}>
+    <Provider store={store}>
       <QueryClientProvider client={queryClient}>
         <HydrateClientState />
         <CartOwnerSync />

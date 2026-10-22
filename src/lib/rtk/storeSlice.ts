@@ -1,15 +1,26 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { ADMIN_STORE_KEY, DEFAULT_STORE_SLUG, STORE_LABELS } from "../store/config";
+import {
+  ADMIN_DEFAULT_STORE_SLUG,
+  ADMIN_STORE_KEY,
+  isKnownAdminStore,
+  STORE_LABELS,
+} from "../store/config";
 import type { RootState } from "./store";
 
 type StoreState = {
   slug: string;
 };
 
-const initialSlug =
-  typeof window !== "undefined"
-    ? localStorage.getItem(ADMIN_STORE_KEY) || DEFAULT_STORE_SLUG
-    : DEFAULT_STORE_SLUG;
+function readInitialAdminStore() {
+  if (typeof window === "undefined") return ADMIN_DEFAULT_STORE_SLUG;
+  // URL wins over last-used tenant (Warqu/Store login handoff).
+  const fromUrl = new URLSearchParams(window.location.search).get("store")?.trim().toLowerCase();
+  if (isKnownAdminStore(fromUrl)) return fromUrl;
+  const saved = localStorage.getItem(ADMIN_STORE_KEY)?.trim().toLowerCase();
+  return isKnownAdminStore(saved) ? saved : ADMIN_DEFAULT_STORE_SLUG;
+}
+
+const initialSlug = readInitialAdminStore();
 
 const storeSlice = createSlice({
   name: "store",

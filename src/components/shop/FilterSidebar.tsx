@@ -55,6 +55,8 @@ export function FilterSidebar({ onClose }: FilterSidebarProps) {
   );
 
   useEffect(() => {
+    // Keep local editable filter controls in sync with the current URL.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedBrands(
       searchParams.get("brand") ? searchParams.get("brand")!.split(",") : []
     );

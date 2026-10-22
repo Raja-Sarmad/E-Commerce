@@ -12,6 +12,12 @@ import { selectStoreSlug } from "@/lib/rtk/storeSlice";
 const VEYA_LOGIN_URL =
   process.env.NEXT_PUBLIC_COSMETIC_SITE_URL?.replace(/\/$/, "") ||
   "http://localhost:3001";
+const OVERDOSE_SITE_URL =
+  process.env.NEXT_PUBLIC_OVERDOSE_SITE_URL?.replace(/\/$/, "") ||
+  "http://localhost:3000";
+const WARQU_SITE_URL =
+  process.env.NEXT_PUBLIC_WARQU_SITE_URL?.replace(/\/$/, "") ||
+  "http://localhost:3002";
 
 export function useLogout() {
   const [logoutMutation] = useLogoutMutation();
@@ -22,8 +28,18 @@ export function useLogout() {
 
   const logout = useCallback(
     async (redirectTo = "/login") => {
+      const urlStore = typeof window === "undefined"
+        ? ""
+        : new URLSearchParams(window.location.search).get("store")?.trim().toLowerCase() || "";
+      const activeStore = urlStore || storeSlug;
       const destination =
-        storeSlug === "cosmetic" ? `${VEYA_LOGIN_URL}/login` : redirectTo;
+        activeStore === "cosmetic"
+          ? `${VEYA_LOGIN_URL}/login`
+          : activeStore === "store"
+            ? `${OVERDOSE_SITE_URL}/login`
+            : activeStore === "warqu"
+              ? WARQU_SITE_URL
+              : redirectTo;
       if (busyRef.current) return;
       busyRef.current = true;
       try {

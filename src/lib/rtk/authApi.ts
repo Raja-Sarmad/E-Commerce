@@ -2,6 +2,7 @@ import { baseApi } from "./baseApi";
 import { normalizeUser, setUser } from "./authSlice";
 import { switchCartOwner } from "./cartSlice";
 import type { Order, OrderStatus, OrderItem, User } from "../types";
+import type { RootState } from "./store";
 
 export type AuthResponse = User;
 
@@ -94,7 +95,7 @@ export const authApi = baseApi.injectEndpoints({
       query: () => ({ url: "/users/me" }),
       transformResponse: (raw: unknown) => normalizeUser(raw as Record<string, unknown>) as User | null,
       providesTags: ["Auth", "User"],
-      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+      async onQueryStarted(_arg, { dispatch, getState, queryFulfilled }) {
         try {
           const { data: user } = await queryFulfilled;
           if (user) {
@@ -103,8 +104,14 @@ export const authApi = baseApi.injectEndpoints({
           } else {
             dispatch(setUser(null));
           }
-        } catch {
-          dispatch(setUser(null));
+        } catch (failure) {
+          const error = (failure as { error?: { status?: number } }).error;
+          if (
+            !(getState() as RootState).auth.accessToken &&
+            (error?.status === 401 || error?.status === 403)
+          ) {
+            dispatch(setUser(null));
+          }
         }
       },
     }),

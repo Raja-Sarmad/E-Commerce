@@ -28,17 +28,17 @@ function pad(n: number) {
 }
 
 export function FlashSale({ products }: FlashSaleProps) {
+  const [time, setTime] = useState(getTimeLeft);
   const [mounted, setMounted] = useState(false);
-  const [time, setTime] = useState({ hours: 0, minutes: 0, seconds: 0 });
-
-  if (products.length === 0) return null;
 
   useEffect(() => {
-    setTime(getTimeLeft());
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     const timer = setInterval(() => setTime(getTimeLeft()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  if (products.length === 0) return null;
 
   const units = [
     { value: time.hours, label: "Hours" },

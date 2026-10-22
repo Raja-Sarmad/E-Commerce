@@ -93,6 +93,8 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (!apiSettings) return;
     const s = apiSettings as Record<string, unknown>;
+    // The settings form is intentionally hydrated from the API once it arrives.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm({
       storeName: String(s.storeName ?? defaults.storeName),
       storeEmail: String(s.storeEmail ?? defaults.storeEmail),

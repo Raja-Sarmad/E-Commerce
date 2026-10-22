@@ -13,13 +13,9 @@ function readStoredTheme(): Theme {
 }
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>("light");
-
-  useEffect(() => {
-    const stored = readStoredTheme();
-    setThemeState(stored);
-    document.documentElement.classList.toggle("dark", stored === "dark");
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(() =>
+    typeof window === "undefined" ? "light" : readStoredTheme()
+  );
 
   useEffect(() => {
     const root = document.documentElement;

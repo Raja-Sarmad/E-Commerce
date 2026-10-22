@@ -1,6 +1,7 @@
 "use client";
 
 import type { IconType } from "react-icons";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -36,6 +37,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useSelector } from "react-redux";
 import { useGetMeQuery } from "@/lib/rtk/authApi";
 import { selectStoreLabel, selectStoreSlug } from "@/lib/rtk/storeSlice";
+import { STORE_BRAND_LOGOS } from "@/lib/store/config";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -139,8 +141,17 @@ function SidebarContent({
   const storeSlug = useSelector(selectStoreSlug);
   const storeLabel = useSelector(selectStoreLabel);
   const isVeya = storeSlug === "cosmetic";
-  const brandInitial = isVeya ? "V" : "N";
-  const brandName = isVeya ? "Veya" : "NovaMart";
+  const isSabPehno = storeSlug === "store";
+  const isWarqu = storeSlug === "warqu";
+  const brandLogo = STORE_BRAND_LOGOS[storeSlug];
+  const brandInitial = isVeya ? "V" : isSabPehno ? "S" : isWarqu ? "W" : "N";
+  const brandName = isVeya
+    ? "Veya"
+    : isSabPehno
+      ? "Sab Pehno"
+      : isWarqu
+        ? "Warqu"
+        : "NovaMart";
 
   return (
     <div className="flex h-full flex-col">
@@ -150,21 +161,49 @@ function SidebarContent({
           collapsed && "justify-center px-0"
         )}
       >
-        <span
-          className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-primary-foreground",
-            isVeya ? "bg-emerald-700" : "bg-primary"
-          )}
-        >
-          {brandInitial}
-        </span>
-        {!collapsed && (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-extrabold tracking-tight text-foreground">
-              {brandName}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">{storeLabel}</p>
+        {brandLogo ? (
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-2",
+              collapsed && "justify-center"
+            )}
+          >
+            <div
+              className={cn(
+                "flex shrink-0 items-center justify-center rounded-xl bg-black",
+                collapsed ? "h-10 w-10 p-1.5" : "h-12 w-[10.5rem] px-2.5 py-1.5"
+              )}
+              title={brandLogo.alt}
+            >
+              <Image
+                src={brandLogo.src}
+                alt={brandLogo.alt}
+                width={collapsed ? 36 : 152}
+                height={collapsed ? 36 : 44}
+                className="h-full w-full object-contain"
+                priority
+              />
+            </div>
           </div>
+        ) : (
+          <>
+            <span
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-extrabold text-primary-foreground",
+                isVeya ? "bg-emerald-700" : "bg-primary"
+              )}
+            >
+              {brandInitial}
+            </span>
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-extrabold tracking-tight text-foreground">
+                  {brandName}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">{storeLabel}</p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -182,7 +221,7 @@ function SidebarContent({
                 return (
                   <li key={item.href}>
                     <Link
-                      href={item.href}
+                      href={`${item.href}${item.href.includes("?") ? "&" : "?"}store=${storeSlug}`}
                       onClick={onNavigate}
                       title={collapsed ? item.label : undefined}
                       className={cn(

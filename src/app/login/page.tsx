@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
 import { AuthShell, AuthFooter } from "@/components/auth/AuthShell";
@@ -8,42 +8,96 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useDispatch } from "react-redux";
 import { useLoginMutation, useGetMeQuery } from "@/lib/rtk/authApi";
-import { baseApi } from "@/lib/rtk/baseApi";
+import { baseApi, getErrorMessage } from "@/lib/rtk/baseApi";
 import { setStoreSlug } from "@/lib/rtk/storeSlice";
 import type { AppDispatch } from "@/lib/rtk/store";
 import { toast } from "@/hooks/use-toast";
 
 const demoCredentials = [
-  { email: "admin@novamart.com", password: "Admin@123456", role: "Admin" },
-  { email: "rachel@example.com", password: "Customer@123", role: "Customer" },
+  { email: "admin@warqu.com", password: "Warqu@123456", role: "Warqu Admin", store: "warqu" },
+  { email: "admin@store.com", password: "Store@123456", role: "Sab Pehno Admin", store: "store" },
+  { email: "admin@sabpehno.com", password: "Admin@123456", role: "NovaMart Admin", store: "ecommerce" },
+  { email: "john@example.com", password: "User@123456", role: "Customer", store: "ecommerce" },
 ];
+
+function getRequestedAdminStore() {
+  if (typeof window === "undefined") return "store";
+  const params = new URLSearchParams(window.location.search);
+  const store = params.get("store")?.trim().toLowerCase();
+  if (
+    store === "store" ||
+    store === "ecommerce" ||
+    store === "cosmetic" ||
+    store === "warqu"
+  ) {
+    return store;
+  }
+  // Preserve tenant from ?next=/admin?store=warqu when store param was dropped.
+  const next = params.get("next");
+  if (next?.startsWith("/")) {
+    try {
+      const nested = new URL(next, window.location.origin).searchParams.get("store")?.trim().toLowerCase();
+      if (
+        nested === "store" ||
+        nested === "ecommerce" ||
+        nested === "cosmetic" ||
+        nested === "warqu"
+      ) {
+        return nested;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return "store";
+}
+
+function getNextPath(store: string) {
+  const fallback = `/admin?store=${store}`;
+  if (typeof window === "undefined") return fallback;
+  const params = new URLSearchParams(window.location.search);
+  const next = params.get("next");
+  if (!next?.startsWith("/") || next.startsWith("//")) return fallback;
+  try {
+    const url = new URL(next, window.location.origin);
+    if (url.origin !== window.location.origin) return fallback;
+    if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+      url.searchParams.set("store", store);
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function LoginPage() {
   const dispatch = useDispatch<AppDispatch>();
-  const [loginMutation, { isLoading: loginLoading }] = useLoginMutation();
+  const [loginMutation] = useLoginMutation();
   const { data: user } = useGetMeQuery();
   const router = useRouter();
 
-  const goAdminEcommerce = () => {
-    dispatch(setStoreSlug("ecommerce"));
-    dispatch(baseApi.util.resetApiState());
-    router.replace("/admin?store=ecommerce");
-  };
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
+  const [selectedStore, setSelectedStore] = useState(getRequestedAdminStore);
+
+  const goAdminDashboard = useCallback(() => {
+    dispatch(setStoreSlug(selectedStore));
+    dispatch(baseApi.util.resetApiState());
+    router.replace(getNextPath(selectedStore));
+  }, [dispatch, router, selectedStore]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || loading) return;
     const adminRoles = ["admin", "super_admin", "manager", "staff"];
     if (adminRoles.includes(user.role ?? "")) {
-      goAdminEcommerce();
+      goAdminDashboard();
     } else {
       router.replace("/account/profile");
     }
-  }, [user, router]);
+  }, [user, loading, router, goAdminDashboard]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -54,19 +108,20 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const user = await loginMutation({ email, password }).unwrap();
+      const user = await loginMutation({ email: email.trim(), password }).unwrap();
       toast.success("Welcome back!", "You have signed in successfully.");
       const adminRoles = ["admin", "super_admin", "manager", "staff"];
       if (adminRoles.includes(user.role ?? "")) {
-        dispatch(setStoreSlug("ecommerce"));
+        dispatch(setStoreSlug(selectedStore));
         dispatch(baseApi.util.resetApiState());
-        router.push("/admin?store=ecommerce");
+        router.push(getNextPath(selectedStore));
       } else {
         router.push("/account/profile");
       }
-    } catch {
-      setFormError("Invalid credentials. Try one of the demo accounts below.");
-      toast.error("Sign in failed", "Invalid email or password.");
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setFormError(message);
+      toast.error("Sign in failed", message);
     }
     setLoading(false);
   };
@@ -146,11 +201,13 @@ export default function LoginPage() {
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {demoCredentials.map((demo) => (
             <button
-              key={demo.email}
+              key={`${demo.store}-${demo.email}`}
               type="button"
               onClick={() => {
                 setEmail(demo.email);
                 setPassword(demo.password);
+                setSelectedStore(demo.store);
+                setFormError("");
               }}
               className="rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/5"
             >

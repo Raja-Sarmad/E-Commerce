@@ -73,7 +73,10 @@ export function useSyncCartStock(options?: { notify?: boolean }) {
   const notifiedRef = useRef<string>("");
   const syncedKeyRef = useRef<string>("");
   const itemsRef = useRef(items);
-  itemsRef.current = items;
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
     if (!stockMap || ids.length === 0) return;

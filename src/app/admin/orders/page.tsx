@@ -42,6 +42,13 @@ const statusOptions: OrderStatus[] = [
 
 const PER_PAGE = 8;
 
+type OrderWithUser = Order & {
+  user?: {
+    name?: string;
+    email?: string;
+  };
+};
+
 export default function AdminOrdersPage() {
   const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
@@ -75,8 +82,8 @@ export default function AdminOrdersPage() {
     return raw.map((o) => ({
       ...o,
       shippingAddress: o.shippingAddress ?? {
-        firstName: (o as any).user?.name?.split(" ")[0] ?? "",
-        lastName: (o as any).user?.name?.split(" ").slice(1).join(" ") ?? "",
+        firstName: (o as OrderWithUser).user?.name?.split(" ")[0] ?? "",
+        lastName: (o as OrderWithUser).user?.name?.split(" ").slice(1).join(" ") ?? "",
         address: "",
         city: "",
         state: "",
@@ -142,7 +149,7 @@ export default function AdminOrdersPage() {
   };
 
   const customerName = (o: Order) => {
-    const user = (o as any).user as { name?: string; email?: string } | undefined;
+    const user = (o as OrderWithUser).user;
     if (user?.name) return user.name;
     if (o.shippingAddress) {
       return `${o.shippingAddress.firstName} ${o.shippingAddress.lastName}`.trim();

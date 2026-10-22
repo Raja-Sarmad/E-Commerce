@@ -46,6 +46,8 @@ import { formatNumber, timeAgo } from "@/lib/utils";
 import { useFormatPrice } from "@/hooks/use-format-price";
 import type { Order } from "@/lib/types";
 import { useMemo } from "react";
+import { useSelector } from "react-redux";
+import { selectStoreLabel } from "@/lib/rtk/storeSlice";
 
 const POLL_INTERVAL = 120000;
 const POLL_OPTS = { pollingInterval: POLL_INTERVAL, skipPollingIfUnfocused: true } as const;
@@ -63,6 +65,7 @@ const donutColors = [
 export default function AdminDashboardPage() {
   const formatPrice = useFormatPrice();
   const { data: user } = useGetMeQuery();
+  const storeLabel = useSelector(selectStoreLabel);
 
   const { data: overview } = useGetDashboardOverviewQuery(undefined, POLL_OPTS);
   const { data: revenueSeries = [] } = useGetRevenueSeriesQuery(8, POLL_OPTS);
@@ -137,7 +140,7 @@ export default function AdminDashboardPage() {
       render: (o) => (
         <span className="text-foreground">
           {recentOrdersRaw.find((r) => r.number === o.number)?.user?.name ??
-            "NovaMart"}
+            storeLabel}
         </span>
       ),
     },
@@ -174,7 +177,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Dashboard"
-        subtitle={`Welcome back, ${user?.name?.split(" ")[0] ?? "Admin"} — here's what's happening at NovaMart today.`}
+        subtitle={`Welcome back, ${user?.name?.split(" ")[0] ?? "Admin"} — here's what's happening at ${storeLabel} today.`}
         actions={
           <>
             <Button href="/admin/products/new" variant="outline" size="sm">
@@ -383,7 +386,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
                 <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
-                  "{review.body}"
+                  &quot;{review.body}&quot;
                 </p>
               </li>
             ))}

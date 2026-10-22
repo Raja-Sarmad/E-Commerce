@@ -11,7 +11,7 @@ function getCloudinaryConfig() {
 
   if (!cloudName || !uploadPreset) {
     throw new Error(
-      "Cloudinary is not configured on the frontend. Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET."
+      "Cloudinary is not configured on the dashboard. Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET."
     );
   }
 

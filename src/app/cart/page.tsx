@@ -39,6 +39,7 @@ import { useFormatPrice } from "@/hooks/use-format-price";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useSyncCartStock } from "@/hooks/use-sync-cart-stock";
+import { useMounted } from "@/hooks/use-mounted";
 
 export default function CartPage() {
   const formatPrice = useFormatPrice();
@@ -51,17 +52,13 @@ export default function CartPage() {
   const { subtotal, discount, shipping, total } = useSelector(selectCartTotals);
   const coupon = useSelector(selectCartCoupon);
   const [validateCoupon] = useValidateCouponMutation();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [code, setCode] = useState("");
 
   useSyncCartStock({ notify: true });
 
   const freeShippingLeft = Math.max(0, siteConfig.freeShippingThreshold - (subtotal - discount));
   const progress = Math.min(100, ((subtotal - discount) / siteConfig.freeShippingThreshold) * 100);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (isAdmin) router.replace("/admin");

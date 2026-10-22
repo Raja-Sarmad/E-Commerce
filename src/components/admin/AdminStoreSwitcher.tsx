@@ -45,6 +45,16 @@ export function AdminStoreSwitcher() {
     dispatch(setStoreSlug(slug));
     dispatch(baseApi.util.resetApiState());
     setOpen(false);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("store", slug);
+      const qs = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${qs ? `?${qs}` : ""}`
+      );
+    }
   }
 
   return (

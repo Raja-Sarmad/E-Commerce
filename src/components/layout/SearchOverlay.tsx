@@ -20,6 +20,8 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
   const router = useRouter();
 
   useEffect(() => {
+    // Reset stale text whenever the overlay is opened.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) setQuery("");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();

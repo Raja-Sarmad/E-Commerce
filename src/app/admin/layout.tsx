@@ -13,10 +13,13 @@ import { selectStoreSlug, setStoreSlug } from "@/lib/rtk/storeSlice";
 import { baseApi } from "@/lib/rtk/baseApi";
 import type { AppDispatch } from "@/lib/rtk/store";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/hooks/use-mounted";
+import { getStoreSlug } from "@/lib/store/config";
 
 const ADMIN_ROLES = ["admin", "super_admin", "manager", "staff"];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
+  const mounted = useMounted();
   const { data: user, isLoading } = useGetMeQuery();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -28,21 +31,36 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const store = params.get("store")?.trim().toLowerCase();
-    const nextStore = store === "cosmetic" || store === "ecommerce" ? store : "ecommerce";
+    const nextStore =
+      store === "cosmetic" ||
+      store === "ecommerce" ||
+      store === "store" ||
+      store === "warqu"
+        ? store
+        : getStoreSlug();
     dispatch(setStoreSlug(nextStore));
     dispatch(baseApi.util.resetApiState());
-  }, [dispatch]);
+
+    // Keep ?store= in the URL so refresh / share always opens the same tenant.
+    if (store !== nextStore) {
+      params.set("store", nextStore);
+      const qs = params.toString();
+      router.replace(`${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    }
+  }, [dispatch, router]);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (!mounted || isLoading) return;
     if (!user) {
-      router.replace("/login");
+      router.replace(
+        `/login?store=${storeSlug}&next=${encodeURIComponent(`/admin?store=${storeSlug}`)}`
+      );
     } else if (!ADMIN_ROLES.includes(user.role ?? "")) {
       router.replace("/account/profile");
     }
-  }, [user, isLoading, router]);
+  }, [mounted, user, isLoading, router, storeSlug]);
 
-  if (isLoading) {
+  if (!mounted || isLoading) {
     return (
       <Container className="py-20 text-center text-muted-foreground">
         Verifying admin access...

@@ -75,6 +75,19 @@ export default function AdminProductsPage() {
     }
   };
 
+  const toggleTopSelling = async (product: Product) => {
+    const next = !product.isBestSeller;
+    try {
+      await updateProduct({ id: product.id, body: { isBestSeller: next } }).unwrap();
+      toast.info(
+        next ? "Top Selling" : "Removed",
+        `“${product.name}” ${next ? "added to Top Selling / homepage Best Sellers" : "removed from Top Selling"}.`
+      );
+    } catch (err) {
+      toast.warning("Could not update", getErrorMessage(err));
+    }
+  };
+
   const removeOne = async (product: Product) => {
     try {
       await deleteProduct(product.id).unwrap();
@@ -222,6 +235,31 @@ export default function AdminProductsPage() {
       ),
     },
     {
+      key: "topSelling",
+      header: "Top Selling",
+      align: "center",
+      sortable: true,
+      sortValue: (p) => (p.isBestSeller ? 1 : 0),
+      render: (p) => (
+        <button
+          type="button"
+          onClick={() => toggleTopSelling(p)}
+          disabled={updating}
+          aria-pressed={p.isBestSeller}
+          title="Show on Store homepage Best Sellers"
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+            p.isBestSeller ? "bg-primary" : "bg-muted"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+              p.isBestSeller ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      ),
+    },
+    {
       key: "actions",
       header: "Actions",
       align: "right",
@@ -278,6 +316,7 @@ export default function AdminProductsPage() {
                 Stock: p.stock,
                 Rating: p.rating,
                 Featured: p.isFeatured ? "Yes" : "No",
+                "Top Selling": p.isBestSeller ? "Yes" : "No",
               }))}
               disabled={isLoading || items.length === 0}
             />

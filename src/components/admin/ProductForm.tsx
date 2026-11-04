@@ -1141,13 +1141,13 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             value={form.tags}
             onChange={(next) => set("tags", next)}
             placeholder="Add a tag"
-            hint="For the Store premium page, add the exact tag Premium. New arrival controls the New Arrival page; Best seller highlights a product on the Store homepage. A compare-at price above the selling price places it in Sales."
+            hint="For the Store premium page, add the exact tag Premium. New arrival controls the New Arrival page; Top Selling shows products in the Store homepage Best Sellers section. A compare-at price above the selling price places it in Sales."
           />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {(
               [
                 { key: "isFeatured", label: "Featured" },
-                { key: "isBestSeller", label: "Best seller (manual highlight)" },
+                { key: "isBestSeller", label: "Top Selling (homepage)" },
                 { key: "isNew", label: "New arrival" },
                 { key: "isTrending", label: "Trending" },
                 { key: "onSale", label: "On sale" },

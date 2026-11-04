@@ -515,6 +515,18 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
     });
   };
 
+  /** First image is what Sab Pehno / storefront cards & PDP show. */
+  const setDisplayImage = (index: number) => {
+    if (index <= 0) return;
+    setImages((prev) => {
+      const next = [...prev];
+      const [picked] = next.splice(index, 1);
+      next.unshift(picked);
+      return next;
+    });
+    toast.success("Display image updated", "This photo will show on the storefront first.");
+  };
+
   const toggleFlag = (key: keyof typeof emptyForm) => {
     if (key === "isFeatured" || key === "isBestSeller" || key === "isNew" || key === "isTrending" || key === "onSale") {
       set(key, !form[key]);
@@ -851,8 +863,16 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
 
       <SectionCard
         title="Images"
-        description="Product photos shown on the storefront. Upload from your device or paste URLs."
+        description="The first photo is the display image on the storefront (cards + product page). Other photos appear in the gallery."
       >
+        <div className="mb-4 rounded-xl border border-amber-300/80 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-semibold">Display image = first photo</p>
+          <p className="mt-1 text-amber-900/90">
+            Customers see this on listing grids and as the main product shot. Click{" "}
+            <strong>Set as display</strong> on any other photo to make it #1.
+          </p>
+        </div>
+
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Button
             type="button"
@@ -890,7 +910,7 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             });
           }}
           placeholder="https://example.com/image.jpg"
-          hint="Add image URLs one at a time. First image is the primary photo."
+          hint="Order matters: the first image is the storefront display photo."
         />
 
         {fieldErrors.images && (
@@ -900,44 +920,103 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
         )}
 
         {images.length > 0 && (
-          <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
-            {images.map((entry, i) => {
-              const src = entry.kind === "file" ? entry.preview : entry.url;
+          <div className="mt-5 space-y-4">
+            {(() => {
+              const display = images[0];
+              const displaySrc = display.kind === "file" ? display.preview : display.url;
               return (
-                <div
-                  key={`${src}-${i}`}
-                  className={cn(
-                    "group relative aspect-square overflow-hidden rounded-xl border border-border",
-                    i === 0 && "ring-2 ring-primary"
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={`Product image ${i + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                  {entry.kind === "file" && (
-                    <span className="absolute left-1 bottom-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      Local
-                    </span>
-                  )}
-                  {i === 0 && (
-                    <span className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      Primary
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    aria-label={`Remove image ${i + 1}`}
-                    onClick={() => removeImage(i)}
-                    className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                  >
-                    <FiTrash2 className="h-3.5 w-3.5" aria-hidden />
-                  </button>
+                <div className="flex flex-col gap-4 rounded-2xl border-2 border-primary/40 bg-primary/5 p-4 sm:flex-row sm:items-center">
+                  <div className="relative mx-auto aspect-[3/4] w-36 shrink-0 overflow-hidden rounded-xl border border-primary/30 bg-muted sm:mx-0 sm:w-40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={displaySrc}
+                      alt="Storefront display preview"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 text-center sm:text-left">
+                    <p className="text-xs font-bold uppercase tracking-wider text-primary">
+                      Storefront display
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      This is what shoppers see first
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Listing cards, brand pages, and the main product image all use this photo.
+                    </p>
+                  </div>
                 </div>
               );
-            })}
+            })()}
+
+            <p className="text-xs font-medium text-muted-foreground">
+              All photos · click <span className="text-foreground">Set as display</span> to change
+              the storefront image
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {images.map((entry, i) => {
+                const src = entry.kind === "file" ? entry.preview : entry.url;
+                const isDisplay = i === 0;
+                return (
+                  <div
+                    key={`${src}-${i}`}
+                    className={cn(
+                      "group relative overflow-hidden rounded-xl border bg-card",
+                      isDisplay
+                        ? "border-primary ring-2 ring-primary"
+                        : "border-border"
+                    )}
+                  >
+                    <div className="relative aspect-square">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={src}
+                        alt={isDisplay ? "Display image" : `Gallery image ${i + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                      {entry.kind === "file" && (
+                        <span className="absolute bottom-1 left-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                          Local
+                        </span>
+                      )}
+                      {isDisplay ? (
+                        <span className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
+                          Display
+                        </span>
+                      ) : (
+                        <span className="absolute left-1 top-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                          Gallery
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={`Remove image ${i + 1}`}
+                        onClick={() => removeImage(i)}
+                        className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        <FiTrash2 className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    </div>
+                    <div className="border-t border-border p-2">
+                      {isDisplay ? (
+                        <p className="text-center text-[11px] font-semibold text-primary">
+                          Showing on storefront
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setDisplayImage(i)}
+                          className="w-full rounded-md bg-muted px-2 py-1.5 text-[11px] font-semibold text-foreground transition hover:bg-primary hover:text-white"
+                        >
+                          Set as display
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </SectionCard>

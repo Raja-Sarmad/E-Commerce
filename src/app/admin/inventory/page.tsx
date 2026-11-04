@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { FiAlertTriangle, FiBox, FiEdit2, FiPackage, FiXCircle } from "react-icons/fi";
+import { FiAlertTriangle, FiBox, FiDollarSign, FiEdit2, FiPackage, FiXCircle } from "react-icons/fi";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -14,9 +14,11 @@ import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
 import { dateRangeFromPreset, type DateRangePreset } from "@/lib/admin-filters";
 import { ExportButton } from "@/components/admin/ExportButton";
 import { toast } from "@/hooks/use-toast";
+import { useFormatPrice } from "@/hooks/use-format-price";
 import {
   useGetInventoryHistoryQuery,
   useGetInventoryLowStockQuery,
+  useGetInventoryReportQuery,
   useAdjustInventoryMutation,
   useGetAdminProductsQuery,
   type InventoryEntry,
@@ -62,6 +64,7 @@ type AdjustmentState = {
 };
 
 export default function AdminInventoryPage() {
+  const formatPrice = useFormatPrice();
   const [query, setQuery] = useState("");
   const [direction, setDirection] = useState("all");
   const [dateRange, setDateRange] = useState<DateRangePreset>("all");
@@ -80,22 +83,31 @@ export default function AdminInventoryPage() {
     ...dates,
   });
   const { data: lowStockItems, isLoading: lowStockLoading } = useGetInventoryLowStockQuery();
-  const { data: productsData } = useGetAdminProductsQuery({});
+  // Full catalog stats (all products for this store) — not the paginated products table.
+  const { data: inventoryReport } = useGetInventoryReportQuery({});
+  const { data: productsData } = useGetAdminProductsQuery({ limit: 100 });
   const [adjustInventory, { isLoading: adjusting }] = useAdjustInventoryMutation();
 
   const entries = useMemo(() => historyData?.items ?? [], [historyData]);
   const allProducts = useMemo(() => productsData?.items ?? [], [productsData]);
   const lowStockList = useMemo(() => lowStockItems ?? [], [lowStockItems]);
 
-  const totalUnits = useMemo(
-    () => allProducts.reduce((sum, p) => sum + (p.stock ?? 0), 0),
-    [allProducts]
-  );
-  const lowStock = useMemo(() => lowStockList.length, [lowStockList]);
-  const outOfStock = useMemo(
-    () => allProducts.filter((p) => p.stock === 0).length,
-    [allProducts]
-  );
+  const invStats = useMemo(() => {
+    const raw = (inventoryReport?.stats ?? {}) as {
+      totalProducts?: number;
+      totalUnits?: number;
+      stockValue?: number;
+      lowStock?: number;
+      outOfStock?: number;
+    };
+    return {
+      totalProducts: Number(raw.totalProducts ?? 0),
+      totalUnits: Number(raw.totalUnits ?? 0),
+      stockValue: Number(raw.stockValue ?? 0),
+      lowStock: Number(raw.lowStock ?? lowStockList.length),
+      outOfStock: Number(raw.outOfStock ?? 0),
+    };
+  }, [inventoryReport, lowStockList.length]);
 
   const totalPages = historyData?.totalPages ?? 1;
   const pageItems = entries;
@@ -276,29 +288,35 @@ export default function AdminInventoryPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
           icon={<FiPackage className="h-5 w-5" aria-hidden />}
           label="Total units"
-          value={formatNumber(totalUnits)}
+          value={formatNumber(invStats.totalUnits)}
           tone="bg-primary/10 text-primary"
+        />
+        <StatCard
+          icon={<FiDollarSign className="h-5 w-5" aria-hidden />}
+          label="Inventory value"
+          value={formatPrice(invStats.stockValue)}
+          tone="bg-success/10 text-success"
         />
         <StatCard
           icon={<FiBox className="h-5 w-5" aria-hidden />}
           label="Products"
-          value={formatNumber(allProducts.length)}
+          value={formatNumber(invStats.totalProducts)}
           tone="bg-info/10 text-info"
         />
         <StatCard
           icon={<FiAlertTriangle className="h-5 w-5" aria-hidden />}
-          label="Low stock (&lt;10)"
-          value={formatNumber(lowStock)}
+          label="Low stock"
+          value={formatNumber(invStats.lowStock)}
           tone="bg-warning/15 text-warning"
         />
         <StatCard
           icon={<FiXCircle className="h-5 w-5" aria-hidden />}
           label="Out of stock"
-          value={formatNumber(outOfStock)}
+          value={formatNumber(invStats.outOfStock)}
           tone="bg-destructive/10 text-destructive"
         />
       </div>

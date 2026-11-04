@@ -31,21 +31,31 @@ export function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-export function formatDate(date: string) {
+function parseDate(date: string | number | Date | null | undefined) {
+  if (date == null || date === "") return null;
+  const parsed = date instanceof Date ? date : new Date(date);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function formatDate(date: string | number | Date | null | undefined) {
+  const parsed = parseDate(date);
+  if (!parsed) return "—";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(parsed);
 }
 
-export function formatDateLong(date: string) {
+export function formatDateLong(date: string | number | Date | null | undefined) {
+  const parsed = parseDate(date);
+  if (!parsed) return "—";
   return new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(parsed);
 }
 
 export function calculateDiscount(price: number, compareAtPrice?: number) {
@@ -54,9 +64,9 @@ export function calculateDiscount(price: number, compareAtPrice?: number) {
 }
 
 export function timeAgo(date: string) {
-  const seconds = Math.floor(
-    (new Date().getTime() - new Date(date).getTime()) / 1000
-  );
+  const parsed = parseDate(date);
+  if (!parsed) return "—";
+  const seconds = Math.floor((new Date().getTime() - parsed.getTime()) / 1000);
   const intervals: [number, string][] = [
     [31536000, "year"],
     [2592000, "month"],

@@ -836,7 +836,11 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             label="Stock quantity"
             type="text"
             inputMode="numeric"
-            value={form.stock}
+            value={
+              form.sizes.length > 0
+                ? String(variants.reduce((sum, v) => sum + (v.stock || 0), 0))
+                : form.stock
+            }
             onChange={(e) => set("stock", sanitizeWholeNumber(e.target.value))}
             onKeyDown={(e) => {
               if (["-", "+", "e", "E", "."].includes(e.key)) e.preventDefault();
@@ -844,6 +848,12 @@ export function ProductForm({ initial, mode }: ProductFormProps) {
             onWheel={(e) => (e.target as HTMLInputElement).blur()}
             error={fieldErrors.stock}
             placeholder="50"
+            disabled={form.sizes.length > 0}
+            hint={
+              form.sizes.length > 0
+                ? "Auto-calculated from stock per size below."
+                : undefined
+            }
           />
           <Input
             label="Display position"
